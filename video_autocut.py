@@ -159,7 +159,7 @@ def combineVideo(tim_len,type,width=1440,length=1080, frag_dur=None, speed=1, bi
             current_list.append((next_i,0))
         filelog += 'part: '+ str(len(current_list)) +': from file : ' + file_list[first] + ' with slice ' + str(current_list[-1][1]) + '\n'
         clip = resize(clip, width, length)
-        clip = concatenate([clip, next_clip])
+        clip = concatenate_videoclips([clip, next_clip])
         # if pbar is not None:
         #     pbar.update(float(frag_dur/tim_len)*100)
     clip = clip.set_audio(None)
@@ -171,7 +171,7 @@ def combineVideo(tim_len,type,width=1440,length=1080, frag_dur=None, speed=1, bi
         os.makedirs(output_folder)
     with open(os.path.join(output_folder,c_time + '.txt'), 'w') as file:
         file.write(filelog)
-    clip.write_videofile(output_path, codec=codec, bitrate=bitrate, fps=fps,preset='slow')
+    clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate,threads=16, fps=fps, preset='slow', )
 
     print('end combineVideo')
 
@@ -180,8 +180,7 @@ def combineVideo(tim_len,type,width=1440,length=1080, frag_dur=None, speed=1, bi
 if __name__ == '__main__':
 
     for i in range(10):
-        combineVideo(tim_len=1200,type='刮香皂',frag_dur=20,speed=1.5)
-        combineVideo(tim_len=1200,type='木工素材',frag_dur=20,speed=1.5)
+        # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
         combineVideo(tim_len=1200, type='磁吸素材', frag_dur=20, speed=1.5)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
