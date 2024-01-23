@@ -87,7 +87,7 @@ class FileTree:
 def sub_clip(clip, frag_dur):
     d = clip.duration / frag_dur
     if d < 1:
-        return clip
+        return clip,0
     else:
         d = math.floor(d)
         if d <=3:
@@ -181,7 +181,8 @@ if __name__ == '__main__':
 
     for i in range(10):
         # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
-        combineVideo(tim_len=1200, type='磁吸素材', frag_dur=20, speed=1.5)
+        combineVideo(tim_len=1200, type='磁吸素材', frag_dur=30, speed=1.3)
+        combineVideo(tim_len=1200, type='木工素材', frag_dur=30, speed=1.3)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
 # # Load myHolidays.mp4 and select the subclip 00:00:50 - 00:00:60
