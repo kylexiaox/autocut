@@ -185,20 +185,3 @@ if __name__ == '__main__':
         combineVideo(tim_len=1200, type='木工素材', frag_dur=30, speed=1.3)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
-# # Load myHolidays.mp4 and select the subclip 00:00:50 - 00:00:60
-# clip = VideoFileClip("1.mp4").subclip(50,60)
-#
-# # Reduce the audio volume (volume x 0.8)
-# clip = clip.volumex(0.8)
-#
-# # Generate a text clip. You can customize the font, color, etc.
-# txt_clip = TextClip("My Holidays 2013",fontsize=70,color='white')
-#
-# # Say that you want it to appear 10s at the center of the screen
-# txt_clip = txt_clip.set_pos('center').set_duration(10)
-#
-# # Overlay the text clip on the first video clip
-# video = CompositeVideoClip([clip, txt_clip])
-#
-# # Write the result to a file (many options available !)
-# video.write_videofile("myHolidays_edited.mp4")
