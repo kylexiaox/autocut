@@ -9,9 +9,12 @@ import math
 import os
 import random
 import time
+from moviepy.video.fx.all import *
 
 # 指定要构建目录树的目录
 target_directory = "/Volumes/公共空间/解压视频"
+
+video_directory = "/Volumes/公共空间/配音文件/短片"
 
 result_directory = "/Volumes/公共空间/产出视频"
 
@@ -101,26 +104,26 @@ def sub_clip(clip, frag_dur):
 
 
 
-def resize(clip,width,length,method='crop'):
-    o_width = clip.size[0]
-    o_length = clip.size[1]
-    if float(width/length) > float(o_width/o_length):
-        """ 需要变宽 """
-        x1 = 0
-        x2 = o_width
-        y1 = o_length/2 - o_width * float(length / width) / 2
-        y2 = o_length/2 + o_width * float(width / length) / 2
-    else:
-        """ 需要变窄 """
-        y1 = 0
-        y2 = o_length
-        x1 = o_width/2 - o_length * float(width / length) / 2
-        x2 = o_width/2 + o_length * float(width / length) / 2
-    clip = clip.crop(x1, y1, x2, y2)
-    return clip
+# def resize(clip,width,length,method='crop'):
+#     o_width = clip.size[0]
+#     o_length = clip.size[1]
+#     if float(width/length) > float(o_width/o_length):
+#         """ 需要变宽 """
+#         x1 = 0
+#         x2 = o_width
+#         y1 = o_length/2 - o_width * float(length / width) / 2
+#         y2 = o_length/2 + o_width * float(width / length) / 2
+#     else:
+#         """ 需要变窄 """
+#         y1 = 0
+#         y2 = o_length
+#         x1 = o_width/2 - o_length * float(width / length) / 2
+#         x2 = o_width/2 + o_length * float(width / length) / 2
+#     clip = clip.crop(x1, y1, x2, y2)
+#     return clip
 
 # @progress_bar_decorator(total_iterations=100)
-def combineVideo(tim_len,type,width=1440,length=1080, frag_dur=None, speed=1, bitrate='5000k', codec='libx264', fps=None):
+def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=None, speed=1, bitrate='5000k', codec='libx264', fps=None):
     """
     :param tim_len: 时间要求长度
     :param type: 视频类型，哪种类型的内容
@@ -144,7 +147,7 @@ def combineVideo(tim_len,type,width=1440,length=1080, frag_dur=None, speed=1, bi
         current_list.append((first, ini))
     else:
         current_list.append((first, 0))
-    clip = resize(clip, width, length)
+    # clip = clip.fx(vfx.resize,width=width,height=length)
     filelog += 'part: 1: from file : '+file_list[first] + ' with slice ' + str(current_list[-1][1]) + '\n'
     while clip.duration < tim_len:
         next_i = random.randint(0, len(file_list) - 1)
@@ -158,11 +161,12 @@ def combineVideo(tim_len,type,width=1440,length=1080, frag_dur=None, speed=1, bi
         else:
             current_list.append((next_i,0))
         filelog += 'part: '+ str(len(current_list)) +': from file : ' + file_list[first] + ' with slice ' + str(current_list[-1][1]) + '\n'
-        clip = resize(clip, width, length)
+        # clip = clip.fx(vfx.resize,width=width,height=length)
         clip = concatenate_videoclips([clip, next_clip])
         # if pbar is not None:
         #     pbar.update(float(frag_dur/tim_len)*100)
     clip = clip.set_audio(None)
+    clip = clip.fx(vfx.resize, width=width, height=length)
     output_folder = result_directory + '/' + type + '/' + datetime.now().date().strftime("%Y%m%d")
     c_time = str(time.time()).split('.')[0]
     output_path = os.path.join(output_folder, c_time + '.mp4')
