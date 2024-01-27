@@ -104,23 +104,23 @@ def sub_clip(clip, frag_dur):
 
 
 
-# def resize(clip,width,length,method='crop'):
-#     o_width = clip.size[0]
-#     o_length = clip.size[1]
-#     if float(width/length) > float(o_width/o_length):
-#         """ 需要变宽 """
-#         x1 = 0
-#         x2 = o_width
-#         y1 = o_length/2 - o_width * float(length / width) / 2
-#         y2 = o_length/2 + o_width * float(width / length) / 2
-#     else:
-#         """ 需要变窄 """
-#         y1 = 0
-#         y2 = o_length
-#         x1 = o_width/2 - o_length * float(width / length) / 2
-#         x2 = o_width/2 + o_length * float(width / length) / 2
-#     clip = clip.crop(x1, y1, x2, y2)
-#     return clip
+def resize(clip,width,length,method='crop'):
+    o_width = clip.size[0]
+    o_length = clip.size[1]
+    if float(width/length) > float(o_width/o_length):
+        """ 需要变宽 """
+        x1 = 0
+        x2 = o_width
+        y1 = o_length/2 - o_width * float(length / width) / 2
+        y2 = o_length/2 + o_width * float(width / length) / 2
+    else:
+        """ 需要变窄 """
+        y1 = 0
+        y2 = o_length
+        x1 = o_width/2 - o_length * float(width / length) / 2
+        x2 = o_width/2 + o_length * float(width / length) / 2
+    clip = clip.crop(x1, y1, x2, y2)
+    return clip
 
 # @progress_bar_decorator(total_iterations=100)
 def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=None, speed=1, bitrate='5000k', codec='libx264', fps=None):
@@ -147,6 +147,7 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=None, speed=1, bi
         current_list.append((first, ini))
     else:
         current_list.append((first, 0))
+
     # clip = clip.fx(vfx.resize,width=width,height=length)
     filelog += 'part: 1: from file : '+file_list[first] + ' with slice ' + str(current_list[-1][1]) + '\n'
     while clip.duration < tim_len:
@@ -166,7 +167,10 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=None, speed=1, bi
         # if pbar is not None:
         #     pbar.update(float(frag_dur/tim_len)*100)
     clip = clip.set_audio(None)
-    clip = clip.fx(vfx.resize, width=width, height=length)
+    # 拉伸
+    # clip = clip.fx(vfx.resize, width=width, height=length)
+    # 裁剪切割
+    clip = resize(clip, width, length)
     output_folder = result_directory + '/' + type + '/' + datetime.now().date().strftime("%Y%m%d")
     c_time = str(time.time()).split('.')[0]
     output_path = os.path.join(output_folder, c_time + '.mp4')
@@ -185,7 +189,6 @@ if __name__ == '__main__':
 
     for i in range(10):
         # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
-        combineVideo(tim_len=1200, type='磁吸素材', frag_dur=30, speed=1.3)
-        combineVideo(tim_len=1200, type='木工素材', frag_dur=30, speed=1.3)
+        combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=30, speed=1.3)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
