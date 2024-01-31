@@ -14,6 +14,7 @@ from text import *
 import json
 from Crypto.Cipher import AES
 import base64
+import time
 
 
 headers = {
@@ -36,9 +37,12 @@ sign = "fe72b4e8b57e1c6523599d57143b39f74544d353af51b645673b7a54c96ad028d77acf89
 
 key = 'abcdefgabcdefg12'
 
+video_directory = "/Volumes/公共空间/配音文件/短片/"
+
 def dubbing_for_long(long_text,result_filename,voice_type=301068,):
     """
     长文本=>音频
+    文本小于8000字
     :param long_text:
     :param voice_type:
     :param result_filename:
@@ -58,6 +62,7 @@ def dubbing_for_long(long_text,result_filename,voice_type=301068,):
         return 0
     payload_get_data = '{"taskId":"'+taskId+'"}'
     payload_get_data = payload_get_data.encode('UTF-8')
+    time.sleep(10)
     response = requests.request("POST", get_data_url, headers=headers, data=payload_get_data)
     if response.status_code == 200:
         data = json.loads(response.content.decode('UTF-8'))['data']
@@ -66,8 +71,8 @@ def dubbing_for_long(long_text,result_filename,voice_type=301068,):
     audio_url = cipher.decrypt(base64.b64decode(data))
     response = requests.get(url=audio_url,headers=headers)
     if response.status_code == 200:
-        print(response.content)
-        with open(result_filename + '.mp3', 'wb') as file:
+
+        with open(video_directory+result_filename + '.mp3', 'wb') as file:
             file.write(response.content)
         print(f'音乐文件已成功下载到: {result_filename}')
         return 1
@@ -95,7 +100,7 @@ def dubbing_test(text, voice_type,result_filename):
     if response.status_code == 200:
         print(response.content)
         # 以二进制写模式打开文件，并将响应内容写入文件
-        with open(result_filename+'.mp3', 'wb') as file:
+        with open(video_directory+result_filename+'.mp3', 'wb') as file:
             file.write(response.content)
         print(f'音乐文件已成功下载到: {result_filename}')
         return 1
@@ -106,7 +111,6 @@ def dubbing_test(text, voice_type,result_filename):
 
 
 if __name__ == '__main__':
-    dubbing_for_long('一天已经渐渐变得黑暗，我站在巨大的别墅外。别墅内灯火通明，透过窗户可以隐约看到许家的爸爸妈妈、许白薇和许阳。他们是一个幸福的四口之家，而我却是一个格格不入的外来者。这一切要追溯到三年前，我的养父母去世前告诉我，我是被他们偷换的孩子。为了让他们的亲生儿子过上富裕的生活，他们替我与一个富商家的孩子进行了置换。然而，十几年后，他们意识到错误，感到非常抱歉，并希望我能在他们去世后回到亲生父母身边，找到一个照顾我的人。','重生后')
-
+    pass
 
 

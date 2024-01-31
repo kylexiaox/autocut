@@ -11,7 +11,7 @@ from openai import OpenAI
 
 
 # Once you add your API key below, make sure to not share it with anyone! The API key should remain private.
-OPENAI_API_KEY=''
+OPENAI_API_KEY='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'
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 completion = client.chat.completions.create(
