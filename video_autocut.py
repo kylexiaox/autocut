@@ -88,11 +88,10 @@ class FileTree:
 
 
 def sub_clip(clip, frag_dur,):
-    d = clip.duration / frag_dur
+    d = math.floor(clip.duration / frag_dur)
     if d < 1:
         return clip,0
     else:
-        d = math.floor(d)
         if d <=2:
             r = 0 # 取中间
         else:
@@ -100,7 +99,7 @@ def sub_clip(clip, frag_dur,):
             r = random.randint(0, d - 1)
         # 掐头去尾
         clip = clip.subclip(r * frag_dur, (r + 1) * frag_dur)
-        return clip,r
+        return clip,r,d
 
 
 
@@ -125,49 +124,63 @@ def resize(clip,width,length,method='crop'):
     return clip
 
 # @progress_bar_decorator(total_iterations=100)
-def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=None, speed=1, bitrate='5000k', codec='libx264', fps=30):
+def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitrate='5000k', codec='libx264', fps=30):
     """
     :param tim_len: 时间要求长度
     :param type: 视频类型，哪种类型的内容
     :return: 文件名
     """
     print('start combineVideo')
+    if frag_dur is None:
+        raise Exception('frag duration is None')
     filelog = ''
     dir = target_directory + '/' + '素材/' + type + '/'
     ft = FileTree(dir)
     file_list = ft.get_file_list()
     random.seed(time.time())
-    current_list = []  # 已经添加的序号
+    current_dict = {}  # 已经添加的序号
+    total_materials_length = 0 # 需要控制总时长，否则内存会爆，一般为目标时长的10倍，如果总素材的时长超过需求的10倍，则不再追加新素材，防止内存溢出
     first = random.randint(0, len(file_list)-1)
     path = dir + file_list[first]
-    clip = VideoFileClip(path)
+    clip_orginal = VideoFileClip(path)
     if fps is not None:
-        fps = clip.fps
-    if frag_dur is not None:
-        clip, ini = sub_clip(clip, frag_dur*speed)
-        clip = clip.speedx(speed)
-        current_list.append((first, ini))
-    else:
-        current_list.append((first, 0))
+        fps = clip_orginal.fps
+    total_materials_length += clip_orginal.duration
+    clip, ini,total = sub_clip(clip_orginal, frag_dur*speed)
+    clip = clip.speedx(speed)
+    current_dict[first] = {'total':total,'occupied_list':[ini],'original_object':clip_orginal}
     clip = resize(clip,width=width,length=length)
-    filelog += 'part: 1: from file : '+file_list[first] + ' with slice ' + str(current_list[-1][1]) + '\n'
+    filelog += 'part: 1: from file : '+file_list[first] + ' with slice ' + str(current_dict.get(first).get('occupied_list')[0]) + '\n'
+    print('part: 1: from file : '+file_list[first] + ' with slice ' + str(current_dict.get(first).get('occupied_list')[0]) )
+    idx = 2 # 循环的index
     while clip.duration < tim_len:
-        next_i = random.randint(0, len(file_list) - 1)
-        while next_i in current_list:
-            next_i = random.randint(0, len(file_list)-1)
-        next_clip = VideoFileClip(dir + file_list[next_i])
-        if frag_dur is not None:
-            next_clip, i_ini = sub_clip(next_clip, frag_dur*speed)
-            next_clip = next_clip.speedx(speed)
-            current_list.append((next_i, i_ini))
+        duplicate_flag = 0 # 是否重复使用同一个视频的内容
+        if total_materials_length < tim_len*5 or len(current_dict)>=math.ceil(len(file_list)*0.8):
+            # 加载时长最多不超过输出时长的5倍(防止内存占用过多) 或者是 当前列表里已经占用的视频超过80%的总资源
+            next_i = random.randint(0, len(file_list) - 1)
+            while next_i in current_dict :
+                next_i = random.randint(0, len(file_list) - 1)
+            next_clip_original = VideoFileClip(dir + file_list[next_i])
         else:
-            current_list.append((next_i,0))
-        filelog += 'part: '+ str(len(current_list)) +': from file : ' + file_list[first] + ' with slice ' + str(current_list[-1][1]) + '\n'
-        # clip = clip.fx(vfx.resize,width=width,height=length)
+            duplicate_flag = 1
+            next_i = random.choice(list(current_dict.keys()))
+            while current_dict.get(next_i).get('total') < len(current_dict.get(next_i).get('occupied_list'))+2:
+                next_i = random.choice(list(current_dict.keys()))
+            next_clip_original = current_dict.get(next_i).get('original_object')
+        total_materials_length += next_clip_original.duration
+        next_clip, i_ini,total = sub_clip(next_clip_original, frag_dur*speed)
+        while i_ini in current_dict.get(next_i).get('occupied_list') if current_dict.get(next_i) is not None else False:
+            next_clip, i_ini,total = sub_clip(next_clip_original, frag_dur * speed)
+        next_clip = next_clip.speedx(speed)
+        if duplicate_flag == 0:
+            current_dict[next_i] = {'total':total,'occupied_list':[i_ini],'original_object':next_clip_original}
+        else:
+            current_dict.get(next_i).get('occupied_list').append(i_ini)
+        filelog += 'part: '+ str(idx) +': from file : ' + file_list[next_i] + ' with slice ' + str(current_dict.get(next_i).get('occupied_list')[-1]) + '\n'
+        print('part: '+ str(idx) +': from file : ' + file_list[next_i] + ' with slice ' + str(current_dict.get(next_i).get('occupied_list')[-1]) )
         next_clip = resize(next_clip, width=width, length=length)
         clip = concatenate_videoclips([clip, next_clip])
-        # if pbar is not None:
-        #     pbar.update(float(frag_dur/tim_len)*100)
+        idx += 1
     clip = clip.set_audio(None)
     # 拉伸
     # clip = clip.fx(vfx.resize, width=width, height=length)
@@ -193,6 +206,6 @@ if __name__ == '__main__':
     for i in range(10):
         # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
         combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=20, speed=1)
-        combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=20, speed=1)
+        combineVideo(tim_len=1200, type='西餐美食小吃视频', frag_dur=10, speed=1)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
