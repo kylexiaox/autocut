@@ -15,44 +15,61 @@ import json
 from Crypto.Cipher import AES
 import base64
 import time
+import config
 
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'X-Access-Token': '5528714820020229',
+    'X-Access-Token': '8910719813414015',
     'Content-Type': 'application/json;charset=UTF-8',
-    "Cookie": "shareToken=9111111113018116",
+    "Cookie": "shareToken=8910719813414015",
     "Accept": "application/json, text/plain, */*",
     "Referer": "https://www.douge.club/",
 }
 
 cookies = {
-    'Hm_lvt_f5b437a514220b03e07d673baf63f78c': '1705589966',
-    'fromId': 'bdbrand',
-    'shareToken': '5528714820020229',
-    'Hm_lpvt_f5b437a514220b03e07d673baf63f78c': '1705590163'
+    'Hm_lvt_f5b437a514220b03e07d673baf63f78c': '1706376932',
+    'fromId': 'bdmyzirj',
+    'shareToken': '8910719813414015',
+    'Hm_lvt_f5b437a514220b03e07d673baf63f78c':'1705589966,1706282698,1706374969'
 }
 
-sign = "fe72b4e8b57e1c6523599d57143b39f74544d353af51b645673b7a54c96ad028d77acf89af2df9d693d39715995df59a7d972d7866926f17f30104f6130ada5b"
+sign = "759c46ed8f8b67c3a9a82b8c0d3d34f6ab074ce60bc57f9e24d55f26f2c897ae0713afa2939bf930cc0d8266b7b90b08f2538de9925fdd2f883ff10bfa4d335d"
 
 key = 'abcdefgabcdefg12'
 
-video_directory = "/Volumes/公共空间/配音文件/短片/"
 
-def dubbing_for_long(long_text,result_filename,voice_type=301068,):
+
+
+def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8):
     """
-    长文本=>音频
-    文本小于8000字
+    content_type = 8 为短片，0为长篇
     :param long_text:
-    :param voice_type:
     :param result_filename:
+    :param voice_type:
+    :param content_type:
     :return:
     """
+    ## 男生voice_type = 301068 style_degree= 2 pitch=10%
+    ## 女生voice_tyoe = 309102 stype_degree= 0 pitch = 0%
+
+    malevoice = {'voice_type':'301068','style_degree': '2','pitch':'10%'}
+    femailvoice = {'voice_type':'309102','style_degree': '0','pitch':'0%'}
+
+    if content_type == 8:
+        audio_dir = config.audio_directory_short
+    elif content_type == 0:
+        audio_dir = config.audio_directory_long
+
+    if voice_type == 'female':
+        voice = femailvoice
+    else:
+        voice = malevoice
 
     get_taskid_url = "https://www.douge.club/peiyin/user/webNewSynGenerateVoiceNew"
     get_data_url = 'https://www.douge.club/peiyin/user/getVoiceAudioUrlWeb'
 
-    payload_get_taskid = '{"speed":15,"text":"'+long_text+'","voice":"'+str(voice_type)+'","styleDegree":2,"pitch":"10%","version":"28.0","sign":"'+sign+'"}'
+    payload_get_taskid = '{"speed":16,"text":"'+long_text+'","voice":"'+voice.get('voice_type')+'","styleDegree":'+voice.get('style_degree')+',"pitch":"'+voice.get('pitch')+'","version":"28.0","sign":"'+sign+'"}'
     payload_get_taskid = payload_get_taskid.encode('UTF-8')
     response = requests.request("POST", get_taskid_url, headers=headers, data=payload_get_taskid)
     if response.status_code == 200:
@@ -62,7 +79,7 @@ def dubbing_for_long(long_text,result_filename,voice_type=301068,):
         return 0
     payload_get_data = '{"taskId":"'+taskId+'"}'
     payload_get_data = payload_get_data.encode('UTF-8')
-    time.sleep(10)
+    time.sleep(20)
     response = requests.request("POST", get_data_url, headers=headers, data=payload_get_data)
     if response.status_code == 200:
         data = json.loads(response.content.decode('UTF-8'))['data']
@@ -72,7 +89,7 @@ def dubbing_for_long(long_text,result_filename,voice_type=301068,):
     response = requests.get(url=audio_url,headers=headers)
     if response.status_code == 200:
 
-        with open(video_directory+result_filename + '.mp3', 'wb') as file:
+        with open(audio_dir+result_filename + '.mp3', 'wb') as file:
             file.write(response.content)
         print(f'音乐文件已成功下载到: {result_filename}')
         return 1
@@ -94,7 +111,7 @@ def dubbing_test(text, voice_type,result_filename):
     """
     # 转换语音最多8000字
     url = "https://www.douge.club/peiyin/user/webAudition"
-    payload = '{"speed":5,"styleDegree":0,"highDensity":0,"text":"' + text + '","voice":"' + voice_type + '","pitch":"0","sign":"'+sign+'"}'
+    payload = '{"speed":20,"styleDegree":0,"highDensity":0,"text":"' + text + '","voice":"' + voice_type + '","pitch":"0","sign":"'+sign+'"}'
     payload = payload.encode('UTF-8')
     response = requests.request("POST", url, headers=headers, data=payload)
     if response.status_code == 200:

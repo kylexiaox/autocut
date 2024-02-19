@@ -205,7 +205,7 @@ if __name__ == '__main__':
 
     for i in range(10):
         # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
-        combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=20, speed=1)
-        combineVideo(tim_len=1200, type='西餐美食小吃视频', frag_dur=10, speed=1)
+        # combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=20, speed=1)
+        combineVideo(tim_len=1200, type='西餐美食小吃视频', frag_dur=15, speed=1)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
