@@ -9,14 +9,11 @@ import math
 import os
 import random
 import time
+import config
 from moviepy.video.fx.all import *
 
 # 指定要构建目录树的目录
-target_directory = "/Volumes/公共空间/解压视频"
 
-video_directory = "/Volumes/公共空间/配音文件/短片"
-
-result_directory = "/Volumes/公共空间/产出视频"
 
 
 # 进度条装饰器
@@ -90,7 +87,7 @@ class FileTree:
 def sub_clip(clip, frag_dur,):
     d = math.floor(clip.duration / frag_dur)
     if d < 1:
-        return clip,0
+        return clip,0,d
     else:
         if d <=2:
             r = 0 # 取中间
@@ -124,22 +121,23 @@ def resize(clip,width,length,method='crop'):
     return clip
 
 # @progress_bar_decorator(total_iterations=100)
-def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitrate='5000k', codec='libx264', fps=30):
+def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitrate='3000k', codec='libx264', fps=30,write=True):
     """
     :param tim_len: 时间要求长度
     :param type: 视频类型，哪种类型的内容
     :return: 文件名
+    固定的时长的素材
     """
     print('start combineVideo')
     if frag_dur is None:
         raise Exception('frag duration is None')
     filelog = ''
-    dir = target_directory + '/' + '素材/' + type + '/'
+    dir = config.target_directory + '/' + '素材/' + type + '/'
     ft = FileTree(dir)
     file_list = ft.get_file_list()
     random.seed(time.time())
     current_dict = {}  # 已经添加的序号
-    total_materials_length = 0 # 需要控制总时长，否则内存会爆，一般为目标时长的10倍，如果总素材的时长超过需求的10倍，则不再追加新素材，防止内存溢出
+    total_materials_length = 0 # 需要控制总时长，否则内存会爆，一般为目标时长的5倍，如果总素材的时长超过需求的5倍，则不再追加新素材，防止内存溢出
     first = random.randint(0, len(file_list)-1)
     path = dir + file_list[first]
     clip_orginal = VideoFileClip(path)
@@ -154,6 +152,10 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitr
     print('part: 1: from file : '+file_list[first] + ' with slice ' + str(current_dict.get(first).get('occupied_list')[0]) )
     idx = 2 # 循环的index
     while clip.duration < tim_len:
+        if tim_len - clip.duration < frag_dur:
+            tmp_frag_dur = tim_len - clip.duration
+        else:
+            tmp_frag_dur = frag_dur
         duplicate_flag = 0 # 是否重复使用同一个视频的内容
         if total_materials_length < tim_len*5 or len(current_dict)>=math.ceil(len(file_list)*0.8):
             # 加载时长最多不超过输出时长的5倍(防止内存占用过多) 或者是 当前列表里已经占用的视频超过80%的总资源
@@ -168,9 +170,9 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitr
                 next_i = random.choice(list(current_dict.keys()))
             next_clip_original = current_dict.get(next_i).get('original_object')
         total_materials_length += next_clip_original.duration
-        next_clip, i_ini,total = sub_clip(next_clip_original, frag_dur*speed)
+        next_clip, i_ini,total = sub_clip(next_clip_original, tmp_frag_dur*speed)
         while i_ini in current_dict.get(next_i).get('occupied_list') if current_dict.get(next_i) is not None else False:
-            next_clip, i_ini,total = sub_clip(next_clip_original, frag_dur * speed)
+            next_clip, i_ini,total = sub_clip(next_clip_original, tmp_frag_dur * speed)
         next_clip = next_clip.speedx(speed)
         if duplicate_flag == 0:
             current_dict[next_i] = {'total':total,'occupied_list':[i_ini],'original_object':next_clip_original}
@@ -186,17 +188,22 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitr
     # clip = clip.fx(vfx.resize, width=width, height=length)
     # 裁剪切割
     # clip = resize(clip, width, length)
-    output_folder = result_directory + '/' + type + '/' + datetime.now().date().strftime("%Y%m%d")
-    c_time = str(time.time()).split('.')[0]
-    output_path = os.path.join(output_folder, c_time + '.mp4')
-    # 确保输出文件夹路径存在，如果不存在则创建
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-    with open(os.path.join(output_folder,c_time + '.txt'), 'w') as file:
-        file.write(filelog)
-    clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate,threads=24, fps=fps, preset='medium', )
+    if write:
+        output_folder = config.result_directory + '/' + type + '/' + datetime.now().date().strftime("%Y%m%d")
+        c_time = str(time.time()).split('.')[0]
+        output_path = os.path.join(output_folder, c_time + '.mp4')
+        # 确保输出文件夹路径存在，如果不存在则创建
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        with open(os.path.join(output_folder,c_time + '.txt'), 'w') as file:
+            file.write(filelog)
+        clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate,threads=24, fps=fps, preset='medium', )
+        print('end combineVideo')
+        return output_path
+    else:
+        return clip,filelog
 
-    print('end combineVideo')
+
 
 
 

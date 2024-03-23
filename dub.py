@@ -20,21 +20,21 @@ import config
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'X-Access-Token': '8910719813414015',
+    'X-Access-Token': '2021442124710921',
     'Content-Type': 'application/json;charset=UTF-8',
-    "Cookie": "shareToken=8910719813414015",
+    "Cookie": "shareToken=2021442124710921",
     "Accept": "application/json, text/plain, */*",
     "Referer": "https://www.douge.club/",
 }
 
 cookies = {
-    'Hm_lvt_f5b437a514220b03e07d673baf63f78c': '1706376932',
+    'Hm_lvt_f5b437a514220b03e07d673baf63f78c': '1708999493',
     'fromId': 'bdmyzirj',
-    'shareToken': '8910719813414015',
-    'Hm_lvt_f5b437a514220b03e07d673baf63f78c':'1705589966,1706282698,1706374969'
+    'shareToken': '2021442124710921',
+    'Hm_lpvt_f5b437a514220b03e07d673baf63f78c':'1708999778'
 }
 
-sign = "759c46ed8f8b67c3a9a82b8c0d3d34f6ab074ce60bc57f9e24d55f26f2c897ae0713afa2939bf930cc0d8266b7b90b08f2538de9925fdd2f883ff10bfa4d335d"
+sign = "6e4739abf14a3fa5c2fa41e6da89e5cb12a3a0f9e2e4c9846c1454627345678260829eb18b0b2070c70b7a9ae19024416c84ce91045af90c7ddbd0f7e0cca2dd"
 
 key = 'abcdefgabcdefg12'
 
@@ -68,18 +68,22 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
 
     get_taskid_url = "https://www.douge.club/peiyin/user/webNewSynGenerateVoiceNew"
     get_data_url = 'https://www.douge.club/peiyin/user/getVoiceAudioUrlWeb'
+    get_srt_id_url = 'https://www.douge.club/peiyin/user/analyzeAudioUrlWeb'
+    get_srt_url = 'https://www.douge.club/peiyin/user/analyzeResultWeb'
 
     payload_get_taskid = '{"speed":16,"text":"'+long_text+'","voice":"'+voice.get('voice_type')+'","styleDegree":'+voice.get('style_degree')+',"pitch":"'+voice.get('pitch')+'","version":"28.0","sign":"'+sign+'"}'
+
     payload_get_taskid = payload_get_taskid.encode('UTF-8')
     response = requests.request("POST", get_taskid_url, headers=headers, data=payload_get_taskid)
     if response.status_code == 200:
+        print(response.content.decode('UTF-8'))
         taskId = json.loads(response.content.decode('UTF-8'))['data']
         print(taskId)
     else:
         return 0
     payload_get_data = '{"taskId":"'+taskId+'"}'
     payload_get_data = payload_get_data.encode('UTF-8')
-    time.sleep(20)
+    time.sleep(120)
     response = requests.request("POST", get_data_url, headers=headers, data=payload_get_data)
     if response.status_code == 200:
         data = json.loads(response.content.decode('UTF-8'))['data']
@@ -88,15 +92,41 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     audio_url = cipher.decrypt(base64.b64decode(data))
     response = requests.get(url=audio_url,headers=headers)
     if response.status_code == 200:
-
         with open(audio_dir+result_filename + '.mp3', 'wb') as file:
             file.write(response.content)
         print(f'音乐文件已成功下载到: {result_filename}')
-        return 1
+
     else:
         print(f'下载失败，状态码: {response.status_code}')
         return 0
-        # 以二进制写模式打开文件，并将响应内容写入文件
+    #### 获取字幕
+    ## 先拿 taskid
+    payload_srt_id = '{"openConfiguration":null,"upUrl":"'+str(audio_url)+'",'+'"text":"'+long_text+'"}'
+    payload_srt_id = payload_srt_id.encode('UTF-8')
+    response = requests.request("POST",url=get_srt_id_url,headers=headers,data=payload_srt_id)
+    if response.status_code ==200:
+        srt_taskid = json.loads(response.content.decode('UTF-8'))['data']
+    ## 再拿字幕，需要循环
+    payload_srt = '{"taskId":"'+srt_taskid+'","web":true,"textLength":null,"openConfiguration":null,"leaveBlank":true}'
+    counter = 0
+    while(counter<10):
+        response = requests.request(method='POST',url=get_srt_url,data=payload_srt,headers=headers)
+        if response.status_code == 200:
+            print(response.content.decode('UTF-8'))
+            data = json.loads(response.content.decode('UTF-8'))['data']
+            if data['status'] == 1:
+                srt_downlaod_url = data['srtUrl']
+                srt_response = requests.get(srt_downlaod_url)
+                with open(audio_dir+result_filename+'.srt', 'wb') as file:
+                    file.write(srt_response.content)
+                print(f"文件 '{result_filename+'.srt'}' 下载成功！")
+                break
+            else:
+                counter += 1
+                time.sleep(2)
+                continue
+    return audio_dir + result_filename + '.mp3',audio_dir + result_filename + '.srt'
+
 
 
 
@@ -117,7 +147,7 @@ def dubbing_test(text, voice_type,result_filename):
     if response.status_code == 200:
         print(response.content)
         # 以二进制写模式打开文件，并将响应内容写入文件
-        with open(video_directory+result_filename+'.mp3', 'wb') as file:
+        with open(config.video_directory+result_filename+'.mp3', 'wb') as file:
             file.write(response.content)
         print(f'音乐文件已成功下载到: {result_filename}')
         return 1
