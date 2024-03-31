@@ -8,6 +8,7 @@ coding:utf-8
 文字->音频
 音频->字幕
 '''
+import os
 
 import requests
 from text import *
@@ -20,18 +21,20 @@ import config
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'X-Access-Token': '2021442124710921',
+    'X-Access-Token': '3217169178521598',
     'Content-Type': 'application/json;charset=UTF-8',
-    "Cookie": "shareToken=2021442124710921",
+    "Cookie": "shareToken=3217169178521598",
     "Accept": "application/json, text/plain, */*",
     "Referer": "https://www.douge.club/",
 }
 
+### 重新登陆 主要是换 头里的 X-A-token
 cookies = {
-    'Hm_lvt_f5b437a514220b03e07d673baf63f78c': '1708999493',
+    'Hm_lvt_f5b437a514220b03e07d673baf63f78c': '1710257168,1711811849',
     'fromId': 'bdmyzirj',
-    'shareToken': '2021442124710921',
-    'Hm_lpvt_f5b437a514220b03e07d673baf63f78c':'1708999778'
+    'shareToken': '3217169178521598',
+    'Hm_lpvt_f5b437a514220b03e07d673baf63f78c':'1711812689'
+
 }
 
 sign = "6e4739abf14a3fa5c2fa41e6da89e5cb12a3a0f9e2e4c9846c1454627345678260829eb18b0b2070c70b7a9ae19024416c84ce91045af90c7ddbd0f7e0cca2dd"
@@ -41,9 +44,10 @@ key = 'abcdefgabcdefg12'
 
 
 
-def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8):
+def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8,output_dir = None,flag = False,srt = False):
     """
     content_type = 8 为短片，0为长篇
+    flag  为存量拉取
     :param long_text:
     :param result_filename:
     :param voice_type:
@@ -56,10 +60,15 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     malevoice = {'voice_type':'301068','style_degree': '2','pitch':'10%'}
     femailvoice = {'voice_type':'309102','style_degree': '0','pitch':'0%'}
 
-    if content_type == 8:
-        audio_dir = config.audio_directory_short
-    elif content_type == 0:
-        audio_dir = config.audio_directory_long
+    if output_dir is None:
+        if content_type == 8:
+            output_dir = config.audio_directory_short
+        elif content_type == 0:
+            output_dir = config.audio_directory_long
+
+    if flag is True:
+        return output_dir + '/' +result_filename + '.mp3',output_dir+'/' +result_filename+'.srt'
+
 
     if voice_type == 'female':
         voice = femailvoice
@@ -92,7 +101,10 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     audio_url = cipher.decrypt(base64.b64decode(data))
     response = requests.get(url=audio_url,headers=headers)
     if response.status_code == 200:
-        with open(audio_dir+result_filename + '.mp3', 'wb') as file:
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        audio_path = output_dir + '/' +result_filename + '.mp3'
+        with open(audio_path, 'wb') as file:
             file.write(response.content)
         print(f'音乐文件已成功下载到: {result_filename}')
 
@@ -117,7 +129,8 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
             if data['status'] == 1:
                 srt_downlaod_url = data['srtUrl']
                 srt_response = requests.get(srt_downlaod_url)
-                with open(audio_dir+result_filename+'.srt', 'wb') as file:
+                srt_path = output_dir+'/' +result_filename+'.srt'
+                with open(srt_path, 'wb') as file:
                     file.write(srt_response.content)
                 print(f"文件 '{result_filename+'.srt'}' 下载成功！")
                 break
@@ -125,7 +138,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
                 counter += 1
                 time.sleep(2)
                 continue
-    return audio_dir + result_filename + '.mp3',audio_dir + result_filename + '.srt'
+    return audio_path,srt_path
 
 
 

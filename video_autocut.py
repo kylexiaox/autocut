@@ -101,8 +101,16 @@ def sub_clip(clip, frag_dur,):
 
 
 def resize(clip,width,length,method='crop'):
-    # o_width = clip.size[0]
-    # o_length = clip.size[1]
+    o_width = clip.size[0]
+    o_length = clip.size[1]
+    if o_width < width or o_length< length:
+        return None
+    x1 = math.floor(o_width/2 - width/2)
+    x2 = x1 + width
+    y1 = math.floor(o_length/2 - length/2)
+    y2 = y1 +length
+    clip = clip.crop(x1,y1,x2,y2)
+    return clip
     # if float(width/length) > float(o_width/o_length):
     #     """ 需要变宽 """
     #     x1 = 0
@@ -117,14 +125,16 @@ def resize(clip,width,length,method='crop'):
     #     x1 = o_width/2 - o_length * float(width / length) / 2
     #     x2 = o_width/2 + o_length * float(width / length) / 2
     #     clip = clip.crop(x1, y1, x2, y2)
-    clip = clip.fx(vfx.resize, width=width, height=length)
+    # clip = clip.fx(vfx.resize, width=width, height=length)
     return clip
 
 # @progress_bar_decorator(total_iterations=100)
-def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitrate='3000k', codec='libx264', fps=30,write=True):
+def combineVideo(tim_len,type,width=1440,length=720, frag_dur=30, speed=1, bitrate='3000k', codec='libx264', fps=30,write=True, ):
     """
     :param tim_len: 时间要求长度
     :param type: 视频类型，哪种类型的内容
+    1080:1920 竖屏
+    1080:720 横屏
     :return: 文件名
     固定的时长的素材
     """
@@ -147,7 +157,12 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitr
     clip, ini,total = sub_clip(clip_orginal, frag_dur*speed)
     clip = clip.speedx(speed)
     current_dict[first] = {'total':total,'occupied_list':[ini],'original_object':clip_orginal}
-    clip = resize(clip,width=width,length=length)
+    clip = resize(clip,width,length)
+    if clip is None:
+        raise Exception('素材尺寸不对')
+    # clip = resize(clip,width=width,length=length)
+    clip.write_videofile(filename='test.mp4', codec='h264_videotoolbox', bitrate=bitrate, threads=24, fps=fps,
+                    preset='medium', )
     filelog += 'part: 1: from file : '+file_list[first] + ' with slice ' + str(current_dict.get(first).get('occupied_list')[0]) + '\n'
     print('part: 1: from file : '+file_list[first] + ' with slice ' + str(current_dict.get(first).get('occupied_list')[0]) )
     idx = 2 # 循环的index
@@ -181,6 +196,9 @@ def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitr
         filelog += 'part: '+ str(idx) +': from file : ' + file_list[next_i] + ' with slice ' + str(current_dict.get(next_i).get('occupied_list')[-1]) + '\n'
         print('part: '+ str(idx) +': from file : ' + file_list[next_i] + ' with slice ' + str(current_dict.get(next_i).get('occupied_list')[-1]) )
         next_clip = resize(next_clip, width=width, length=length)
+        if next_clip is None:
+            print ('file : ' + file_list[next_i] + '素材尺寸不对')
+            continue
         clip = concatenate_videoclips([clip, next_clip])
         idx += 1
     clip = clip.set_audio(None)
@@ -213,6 +231,6 @@ if __name__ == '__main__':
     for i in range(10):
         # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
         # combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=20, speed=1)
-        combineVideo(tim_len=1200, type='西餐美食小吃视频', frag_dur=15, speed=1)
+        combineVideo(tim_len=1200, type='蛋仔素材', frag_dur=15, speed=1)
     #combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])
 
