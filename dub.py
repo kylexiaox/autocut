@@ -121,7 +121,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     ## 再拿字幕，需要循环
     payload_srt = '{"taskId":"'+srt_taskid+'","web":true,"textLength":null,"openConfiguration":null,"leaveBlank":true}'
     counter = 0
-    while(counter<10):
+    while(counter<20):
         response = requests.request(method='POST',url=get_srt_url,data=payload_srt,headers=headers)
         if response.status_code == 200:
             print(response.content.decode('UTF-8'))

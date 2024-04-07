@@ -7,12 +7,13 @@ coding:utf-8
 @Description:
 '''
 
+import time
 
 audio_directory_long = "/Volumes/公共空间/小说推文/配音文件/长片"
 audio_directory_short = "/Volumes/公共空间/小说推文/配音文件/短片"
 target_directory = "/Volumes/公共空间/解压视频"
 video_directory = "/Volumes/公共空间/小说推文/配音文件/短片"
-result_directory = "/Volumes/公共空间/小说推文/产出视频/成片"
+result_directory = "/Volumes/公共空间/小说推文/产出视频/成片/" + time.strftime("%Y-%m-%d", time.localtime())
 bgm_directory = "/Volumes/公共空间/小说推文/BGM素材/"
 
 

@@ -129,7 +129,7 @@ def resize(clip,width,length,method='crop'):
     return clip
 
 # @progress_bar_decorator(total_iterations=100)
-def combineVideo(tim_len,type,width=1440,length=720, frag_dur=30, speed=1, bitrate='3000k', codec='libx264', fps=30,write=True, ):
+def combineVideo(tim_len,type,width=1080,length=1920, frag_dur=30, speed=1, bitrate='3000k', codec='libx264', fps=30,write=True, ):
     """
     :param tim_len: 时间要求长度
     :param type: 视频类型，哪种类型的内容
@@ -157,7 +157,7 @@ def combineVideo(tim_len,type,width=1440,length=720, frag_dur=30, speed=1, bitra
     clip, ini,total = sub_clip(clip_orginal, frag_dur*speed)
     clip = clip.speedx(speed)
     current_dict[first] = {'total':total,'occupied_list':[ini],'original_object':clip_orginal}
-    clip = resize(clip,width,length)
+    # clip = resize(clip,width,length)
     if clip is None:
         raise Exception('素材尺寸不对')
     # clip = resize(clip,width=width,length=length)
@@ -195,7 +195,7 @@ def combineVideo(tim_len,type,width=1440,length=720, frag_dur=30, speed=1, bitra
             current_dict.get(next_i).get('occupied_list').append(i_ini)
         filelog += 'part: '+ str(idx) +': from file : ' + file_list[next_i] + ' with slice ' + str(current_dict.get(next_i).get('occupied_list')[-1]) + '\n'
         print('part: '+ str(idx) +': from file : ' + file_list[next_i] + ' with slice ' + str(current_dict.get(next_i).get('occupied_list')[-1]) )
-        next_clip = resize(next_clip, width=width, length=length)
+        # next_clip = resize(next_clip, width=width, length=length)
         if next_clip is None:
             print ('file : ' + file_list[next_i] + '素材尺寸不对')
             continue
