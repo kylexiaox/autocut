@@ -229,7 +229,7 @@ def push_to_media(account,filepath,title,publish_time,img_path=None,type='douyin
     with open(filepath+'/'+'abstract.txt', 'r') as file:
         # 读取文件内容
         description = file.read()
-    url = 'http://127.0.0.1:23335/douyin/'+account
+    url = 'http://127.0.0.1:23336/douyin/'+account
     form = {
         'filepath':filepath,
         'title':title,
