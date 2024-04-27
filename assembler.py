@@ -19,8 +19,11 @@ from PIL import Image
 import speech_recognition as sr
 
 
-def assembler(bookid, bgm_name, alias, content_type=0, voice_type='female', bgm_volume=0.15, video_type='西餐美食小吃视频',
-              bitrate='3000k', cover_img='girl1', is_landscape=False):
+def assembler(bookid, bgm_name, alias,publish_time, content_type=0, voice_type='female', bgm_volume=0.15, video_type='西餐美食小吃视频',
+              bitrate='3000k', cover_img='girl1_large', is_landscape=False):
+    # output_folder = '/Volumes/公共空间/小说推文/产出视频/成片/2024-04-27/7345285799862075929_我校花的人生被换走了'
+    # push_to_media(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》", publish_time=publish_time)
+
     # 获取内容音频
     audio_clip, srt_path, book_name = get_text_voice(bookid, content_type=content_type, voice_type=voice_type)
     # 音量标准化
@@ -65,7 +68,8 @@ def assembler(bookid, bgm_name, alias, content_type=0, voice_type='female', bgm_
                                preset='medium', )
     print('视频文件写入完成')
     print("处理封面")
-    get_cover_img(text="《{alias}》", img=cover_img, output_folder=output_folder )
+    get_cover_img(text=f"《{alias}》",w_l_ratio = final_clip.size[0]/final_clip.size[1], img=cover_img, output_folder=output_folder )
+    push_to_media(account='account',filepath=output_folder,title=f"番茄小说sou：《{alias}》",publish_time= publish_time)
     return output_path
 
 
@@ -88,11 +92,16 @@ def get_text_voice(bookid, content_type=0, voice_type='female'):
             paths.append(dubbing_for_long(long_text=text, result_filename=str(bookinfo[0]) + '_' + str(index),
                                           voice_type=voice_type,
                                           output_dir=config.result_directory + '/' + str(bookid) + '_' + bookinfo[0],
-                                          flag=True))
+                                          flag=False))
         info_str = 'book_id : ' + str(bookinfo[2]) + '\n'
         info_str += 'book_name : ' + bookinfo[0] + '\n'
         info_str += 'abstract : ' + bookinfo[1]
         final_output_folder = config.result_directory + '/' + str(bookid) + '_' + bookinfo[0]
+        # 获取摘要
+        abstract = bookinfo[0]
+        if count_chinese_characters(abstract) < 20:
+            # 如果当前摘要小于20个字，得从正文中截取
+            abstract = split_content(text,gap=30,end_with='。')[0]
         if not os.path.exists(final_output_folder):
             os.makedirs(final_output_folder)
         with open(config.audio_directory_short + bookinfo[0] + '_info.txt', 'wb') as file:
@@ -103,6 +112,8 @@ def get_text_voice(bookid, content_type=0, voice_type='female'):
             file.write(text.encode('UTF-8'))
         with open(config.audio_directory_short + bookinfo[0] + '_text.txt', 'wb') as file:
             file.write(text.encode('UTF-8'))
+        with open(os.path.join(final_output_folder, 'abstract.txt'), 'wb') as file:
+            file.write(abstract.encode('UTF-8'))
         audio_clip = None
         for path in paths:
             if audio_clip is None:
@@ -125,7 +136,7 @@ def add_srt_to_video(srt_file, video_clip, font="/Users/xiangxiao/Documents/Font
     print(f'添加字幕文件到视频中，字幕文件{srt_file}')
     def generate_text(txt):
         txt = remove_non_alphanumeric(txt)
-        return TextClip(txt, font=font, fontsize=40, color='white', stroke_color='black', stroke_width=1,
+        return TextClip(txt, font=font, fontsize=40, color='white', stroke_color='black', stroke_width=2,
                         method='caption', size=(450, None))
 
     subtitles = SubtitlesClip(srt_file, generate_text)
@@ -140,10 +151,13 @@ def add_label_to_video(text, pic_file, video_clip, font='Arial Unicode MS', size
     text_clip = TextClip(text, font=font, fontsize=30, color='black', stroke_color='white', stroke_width=2, size=size)
     text_clip = text_clip.set_position(txt_position)
     text_clip = text_clip.set_duration(video_clip.duration)
-    pic_clip = ImageClip(pic_file)
+    pic_img = Image.open(pic_file)
+    pic_img = pic_img.resize(size=(60,60))
+    pic_img.save('temp_pic.png')
+    pic_clip = ImageClip('temp_pic.png')
     pic_clip = pic_clip.set_duration(video_clip.duration)
     pic_clip = pic_clip.set_position(pic_position)
-    pic_clip = pic_clip.resize(width=60, height=60)
+
     video_with_pic = CompositeVideoClip([video_clip, pic_clip])
     video_with_text = CompositeVideoClip([video_with_pic, text_clip])
     # video_with_text.write_videofile("output.mp4",fps=video_clip.fps)
@@ -178,12 +192,12 @@ def remove_non_alphanumeric(text):
     return re.sub(r'[^\w\s\u4e00-\u9fff]', '', text)
 
 
-def get_cover_img(text,img,output_folder="", font='字魂劲道黑',):
+def get_cover_img(text,img,output_folder="",w_l_ratio=0.75, font='字魂劲道黑',):
     # 打开图像文件
     img = Image.open(config.cover_img.get(img))
     # 计算裁剪的区域
-    left = math.floor(img.size[0] / 2 - math.floor(img.size[0] * 0.75 / 2))
-    right = math.floor(img.size[0] / 2 + math.floor(img.size[0] * 0.75 / 2))
+    left = math.floor(img.size[0] / 2 - math.floor(img.size[0] * w_l_ratio / 2))
+    right = math.floor(img.size[0] / 2 + math.floor(img.size[0] * w_l_ratio / 2))
     top = 0
     bottom = img.size[1]
     # 裁剪图像
@@ -192,25 +206,40 @@ def get_cover_img(text,img,output_folder="", font='字魂劲道黑',):
     # 创建 ImageClip 对象
     img_clip = ImageClip('tmp_cover.png')
     # 创建文本剪辑
-    text_clip = TextClip(txt=text, font=config.font.get(font), fontsize=60, color='white', stroke_color='black', stroke_width=3)
+    text_clip = TextClip(txt=text, font=config.font.get(font), fontsize=70, color='white', stroke_color='black', stroke_width=2)
     # 获取文本剪辑的尺寸
     text_width, text_height = text_clip.size
     # 计算文本剪辑的位置，使其居中显示
     text_x = (img_clip.size[0] - text_width) / 2
     text_y = (img_clip.size[1] - text_height) / 2
-
     # 设置文本剪辑的位置
     text_clip = text_clip.set_position((text_x, text_y))
-
     # 将文本剪辑合并到背景视频剪辑上
     final_clip = CompositeVideoClip([img_clip, text_clip])
-
     # 生成合成图像
     final_image_np = final_clip.get_frame(0)  # 获取第 0 秒的图像帧
     final_image_pil = Image.fromarray(final_image_np)
-
     # 保存合成图像
     final_image_pil.save(output_folder+'/'+"cover.png")
+
+
+def push_to_media(account,filepath,title,publish_time,img_path=None,type='douyin_short'):
+    if img_path is None:
+        img_path = filepath+'/'+"cover.png"
+    with open(filepath+'/'+'abstract.txt', 'r') as file:
+        # 读取文件内容
+        description = file.read()
+    url = 'http://127.0.0.1:23335/douyin/'+account
+    form = {
+        'filepath':filepath,
+        'title':title,
+        'type':type,
+        'description':description,
+        'img_path':img_path,
+        'publish_time':publish_time
+    }
+    response = requests.request(method='POST',url=url,data=form,timeout=1500)
+    print(response.text)
 
 
 
@@ -257,6 +286,5 @@ if __name__ == '__main__':
     #                  font='/Users/xiangxiao/Documents/Fonts/字魂劲道黑.ttf')
     # add_label_to_video(text = '🍅小说sou:《美女爱上我》',pic_file='fanqie.png',font='/Users/xiangxiao/Documents/Fonts/字魂劲道黑.ttf')
 
-    # output_path = assembler(bookid=7173533120174492704, bgm_name='冬眠', voice_type='female', video_type='迷你厨房',
-    #                         alias='冷月清秋')
-    edit_cover_img()
+    output_path = assembler(bookid=7345285799862075929, bgm_name='冬眠', voice_type='female', video_type='迷你厨房',
+                            alias='胖妹日记',publish_time='2024-04-28 19:00')

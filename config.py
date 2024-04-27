@@ -35,9 +35,14 @@ font ={
 }
 
 cover_img = {
-    'girl1' : '/Volumes/公共空间/小说推文/封面素材/girl1.png',
-    'girl2' : '/Volumes/公共空间/小说推文/封面素材/girl2.png',
-    'girl3' : '/Volumes/公共空间/小说推文/封面素材/girl3.png',
-    'girl4' : '/Volumes/公共空间/小说推文/封面素材/girl4.png',
+    'girl1': '/Volumes/公共空间/小说推文/封面素材/girl1.png',
+    'girl2': '/Volumes/公共空间/小说推文/封面素材/girl2.png',
+    'girl3': '/Volumes/公共空间/小说推文/封面素材/girl3.png',
+    'girl4': '/Volumes/公共空间/小说推文/封面素材/girl4.png',
+    'girl1_large': '/Volumes/公共空间/小说推文/封面素材/girl1_large.png',
+    'girl2_large': '/Volumes/公共空间/小说推文/封面素材/girl2_large.png',
+    'girl3_large': '/Volumes/公共空间/小说推文/封面素材/girl3_large.png',
+    'girl4_large': '/Volumes/公共空间/小说推文/封面素材/girl4_large.png',
+
 
 }

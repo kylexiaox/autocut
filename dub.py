@@ -47,7 +47,7 @@ key = 'abcdefgabcdefg12'
 def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8,output_dir = None,flag = False,srt = False):
     """
     content_type = 8 为短片，0为长篇
-    flag  为存量拉取
+    flag  为存量拉取,true 为存量拉取，不访问无网络，false为访问网络
     :param long_text:
     :param result_filename:
     :param voice_type:

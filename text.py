@@ -74,7 +74,6 @@ def get_content_from_fanqie_dp(book_id):
     # 使用 BeautifulSoup 剔除标签
     soup = BeautifulSoup(text_content, 'html.parser')
     extract_string = soup.get_text()
-    # cleaned_string = ''.join(remove_non_utf8(char) for char in extract_string)
     # 需要去除文中的分隔符,引号等
     cleaned_string = ''.join([char for char in extract_string if char != '"'])
     cleaned_string = cleaned_string.replace('*','')
