@@ -6,26 +6,24 @@ coding:utf-8
 @Email: btxiaox@gmail.com
 @Description:
 '''
-import config
-from text import *
-from dub import *
+
+from crawler.fanqie_crawler import *
+from crawler.dub import *
 from video_autocut import *
 from moviepy.audio.fx.volumex import volumex
 from moviepy.video.tools.subtitles import SubtitlesClip
-from moviepy.video.io.VideoFileClip import VideoFileClip
 import pysrt
-import re
 from PIL import Image
-import speech_recognition as sr
+import redis
 
 
 def assembler(bookid, bgm_name, alias,publish_time, content_type=0, voice_type='female', bgm_volume=0.15, video_type='西餐美食小吃视频',
               bitrate='3000k', cover_img='girl1_large', is_landscape=False):
-    # output_folder = '/Volumes/公共空间/小说推文/产出视频/成片/2024-04-27/7345285799862075929_我校花的人生被换走了'
-    # push_to_media(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》", publish_time=publish_time)
-
+    # output_folder = '/Volumes/公共空间/小说推文/产出视频/成片/2024-04-30/7345285799862075929_我校花的人生被换走了'
+    # # push_to_media(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》", publish_time=publish_time)
+    # push_to_message_queue(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》", publish_time=publish_time)
     # 获取内容音频
-    audio_clip, srt_path, book_name = get_text_voice(bookid, content_type=content_type, voice_type=voice_type)
+    audio_clip, srt_path, book_name = get_text_voice(bookid, content_type=content_type, voice_type=voice_type,flag= False)
     # 音量标准化
     audio_clip = audio_clip.audio_normalize()
     video_len = audio_clip.duration
@@ -69,16 +67,20 @@ def assembler(bookid, bgm_name, alias,publish_time, content_type=0, voice_type='
     print('视频文件写入完成')
     print("处理封面")
     get_cover_img(text=f"《{alias}》",w_l_ratio = final_clip.size[0]/final_clip.size[1], img=cover_img, output_folder=output_folder )
-    push_to_media(account='account',filepath=output_folder,title=f"番茄小说sou：《{alias}》",publish_time= publish_time)
+    # push_to_media(account='account',filepath=output_folder,title=f"番茄小说sou：《{alias}》",publish_time= publish_time)
+    push_to_message_queue(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》",
+                          publish_time=publish_time)
+
     return output_path
 
 
-def get_text_voice(bookid, content_type=0, voice_type='female'):
+def get_text_voice(bookid, content_type=0, voice_type='female', flag=False):
     """
     通过bookid拿音频+字幕
     :param bookid:
     :param content_type:
     :param voice_type:
+    :param flag: false 重新请求，true，不重新请求
     :return:
     """
     if content_type == 0:
@@ -92,7 +94,7 @@ def get_text_voice(bookid, content_type=0, voice_type='female'):
             paths.append(dubbing_for_long(long_text=text, result_filename=str(bookinfo[0]) + '_' + str(index),
                                           voice_type=voice_type,
                                           output_dir=config.result_directory + '/' + str(bookid) + '_' + bookinfo[0],
-                                          flag=False))
+                                          flag=flag))
         info_str = 'book_id : ' + str(bookinfo[2]) + '\n'
         info_str += 'book_name : ' + bookinfo[0] + '\n'
         info_str += 'abstract : ' + bookinfo[1]
@@ -135,20 +137,27 @@ def get_text_voice(bookid, content_type=0, voice_type='female'):
 def add_srt_to_video(srt_file, video_clip, font="/Users/xiangxiao/Documents/Fonts/yezigongchanghuajuanti.ttf"):
     print(f'添加字幕文件到视频中，字幕文件{srt_file}')
     def generate_text(txt):
-        txt = remove_non_alphanumeric(txt)
-        return TextClip(txt, font=font, fontsize=40, color='white', stroke_color='black', stroke_width=2,
+        txt = filter_non_chinese_and_digits(txt)
+        return TextClip(txt, font=font, fontsize=30, color='white', stroke_color='black', stroke_width=1,
                         method='caption', size=(450, None))
 
     subtitles = SubtitlesClip(srt_file, generate_text)
+    filtered_subtitles = []
+    for subtitle in subtitles:
+        time_gap, text = subtitle
+        filtered_text = filter_non_chinese_and_digits(text)
+        filtered_subtitles.append((time_gap, filtered_text))
+    # 保存新的字幕文件
+    filtered_subtitles_clip = SubtitlesClip(filtered_subtitles)
     result = CompositeVideoClip([video_clip, subtitles.set_position(('center', 650), relative=False)])
     # 输出结果视
-    # result.write_videofile("output.mp4",fps=video.fps)
+    # result.write_videofile("output.mp4",fps=video_clip.fps)
     return result
 
 
 def add_label_to_video(text, pic_file, video_clip, font='Arial Unicode MS', size=(300, None),
                        txt_position=('center', 300),pic_position=('center', 200)):
-    text_clip = TextClip(text, font=font, fontsize=30, color='black', stroke_color='white', stroke_width=2, size=size)
+    text_clip = TextClip(text, font=font, fontsize=25, color='black', stroke_color='white', stroke_width=2, size=size)
     text_clip = text_clip.set_position(txt_position)
     text_clip = text_clip.set_duration(video_clip.duration)
     pic_img = Image.open(pic_file)
@@ -187,10 +196,13 @@ def merge_srt(srts):
     return temp_subs
 
 
-def remove_non_alphanumeric(text):
-    # 使用正则表达式匹配任何非字母数字字符，并将其替换为空字符串
-    return re.sub(r'[^\w\s\u4e00-\u9fff]', '', text)
-
+# 过滤非中文字符和阿拉伯数字
+def filter_non_chinese_and_digits(text):
+    filtered_text = ''
+    for char in text:
+        if '\u4e00' <= char <= '\u9fff' or not char.isdigit():  # 判断字符是否为中文或非数字
+            filtered_text += char
+    return filtered_text
 
 def get_cover_img(text,img,output_folder="",w_l_ratio=0.75, font='字魂劲道黑',):
     # 打开图像文件
@@ -229,7 +241,7 @@ def push_to_media(account,filepath,title,publish_time,img_path=None,type='douyin
     with open(filepath+'/'+'abstract.txt', 'r') as file:
         # 读取文件内容
         description = file.read()
-    url = 'http://127.0.0.1:23336/douyin/'+account
+    url = 'http://127.0.0.1:23335/douyin/'+account
     form = {
         'filepath':filepath,
         'title':title,
@@ -240,6 +252,27 @@ def push_to_media(account,filepath,title,publish_time,img_path=None,type='douyin
     }
     response = requests.request(method='POST',url=url,data=form,timeout=1500)
     print(response.text)
+
+
+def push_to_message_queue(account,filepath,title,publish_time,img_path=None,type='douyin_short'):
+    r = redis.StrictRedis(host='localhost', port=6379, db=0)
+    # 生成唯一的uuid
+    if img_path is None:
+        img_path = filepath+'/'+"cover.png"
+    with open(filepath+'/'+'abstract.txt', 'r') as file:
+        # 读取文件内容
+        description = file.read()
+    form = {
+        'account':account,
+        'filepath':filepath,
+        'title':title,
+        'type':type,
+        'description':description,
+        'img_path':img_path,
+        'publish_time':publish_time
+    }
+    message_id = r.xadd("task_queue", form)
+    print(f"发送数据id：{message_id},消息： {form}")
 
 
 
@@ -287,4 +320,4 @@ if __name__ == '__main__':
     # add_label_to_video(text = '🍅小说sou:《美女爱上我》',pic_file='fanqie.png',font='/Users/xiangxiao/Documents/Fonts/字魂劲道黑.ttf')
 
     output_path = assembler(bookid=7345285799862075929, bgm_name='冬眠', voice_type='female', video_type='迷你厨房',
-                            alias='胖妹日记',publish_time='2024-04-28 19:00')
+                            alias='胖妹日记',publish_time='2024-05-01 16:00')
