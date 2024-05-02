@@ -7,14 +7,17 @@ coding:utf-8
 @Description:
 get text from website
 '''
-from bs4 import BeautifulSoup
+import json
 
+import requests
+from bs4 import BeautifulSoup
+import utils
 from crawler.dub import *
 import config
 from crawler import crawler
 
 
-class fanqie_crawler(crawler):
+class fanqie_crawler(crawler.crawler):
 
     def __init__(self):
         self.headers = {
@@ -33,7 +36,7 @@ class fanqie_crawler(crawler):
         :return:
         '''
         url = 'https://kol.fanqieopen.com/api/platform/content/book/list/v:version?book_id='+str(book_id)+'&content_tab=2&genre='+str(content_type)+'&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
-        response = requests.request('GET',url,headers=headers)
+        response = requests.request('GET',url,headers=self.headers)
         raw_resposne = response.text
         json_resposne = json.loads(raw_resposne)
         book_name = json_resposne['data']['book_list'][0]['book_name']
@@ -44,7 +47,7 @@ class fanqie_crawler(crawler):
         # 拿第一章
         url = 'https://kol.fanqieopen.com/api/platform/content/chapter/list/v:version?book_id='+str(book_id)+'&page_index=0&page_size=500&content_tab=2&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
         payload = {}
-        response = requests.request("GET", url, headers=headers, data=payload)
+        response = requests.request("GET", url, headers=self.headers, data=payload)
         raw_response = response.text
         json_response = json.loads(raw_response)
         item_id = json_response['data']['chapter_list'][0]['item_id']
@@ -54,18 +57,17 @@ class fanqie_crawler(crawler):
         # 拿所有的章节列表，返回json对象
         url = 'https://kol.fanqieopen.com/api/platform/content/chapter/list/v:version?book_id='+str(book_id)+'&page_index=0&page_size=500&content_tab=2&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
         payload = {}
-        response = requests.request("GET", url, headers=headers, data=payload)
+        response = requests.request("GET", url, headers=self.headers, data=payload)
         raw_response = response.text
         json_response = json.loads(raw_response)
         item_ids = json_response['data']['chapter_list']
         return item_ids
 
     def get_content_from_fanqie_dp(self,book_id):
-
         item_id = self.get_first_itemid(book_id)
         url = 'https://kol.fanqieopen.com/api/platform/content/chapter/detail/v:version?book_id='+str(book_id)+'&item_id='+item_id+'&content_tab=2&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
         payload = {}
-        response = requests.request("GET", url, headers=headers, data=payload)
+        response = requests.request("GET", url, headers=self.headers, data=payload)
         raw_response = response.text
         json_response = json.loads(raw_response)
         text_content = json_response['data']['content']
@@ -85,7 +87,7 @@ class fanqie_crawler(crawler):
             url = 'https://kol.fanqieopen.com/api/platform/content/chapter/detail/v:version?book_id=' + str(
                 book_id) + '&item_id=' + item_id + '&content_tab=2&app_id=457699&msToken=VFH0d7_yVqMP_591hkIyqtcTuhBcVazH00elNGsW3RpEiwuhEuhbmHsNCJfzFGdKXWef5WLAysXj9iTfNlU738vKF9lDMj2mw4KKpRD1B8x9Dz2oNaUcy5dDFHu7Y7o=&X-Bogus=DFSzswVus5vANaDttitQWDLNKBTL'
             payload = {}
-            response = requests.request("GET", url, headers=headers, data=payload)
+            response = requests.request("GET", url, headers=self.headers, data=payload)
             raw_response = response.text
             json_response = json.loads(raw_response)
             if json_response['data'] is None:
@@ -98,55 +100,33 @@ class fanqie_crawler(crawler):
             re_texts.append(cleaned_string)
         return re_texts
 
-def count_chinese_characters(input_string):
-    count = 0
-    for char in input_string:
-        # 判断字符是否是汉字
-        if '\u4e00' <= char <= '\u9fff':
-            count += 1
-    return count
+    def turn_back(self,bookid,video_id):
+        url = 'https://kol.fanqieopen.com/api/platform/promotion/post/create/v:version?app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
+        payload ='{"alias_id":"'+str(bookid)+'","post_records":[{"post_link":"https://www.douyin.com/video/'+str(video_id)+'"}],"alias_type":1}'
+        response = requests.post(url,headers=self.headers, data=payload)
+        if response.status_code == 200:
+            raw_response = response.text
+            json_response = json.loads(raw_response)
+            try:
+                code = json_response['code']
+                message  = json_response['message']
+                log_id = json_response['log_id']
+            except Exception as e:
+                return False
 
-def split_content(input_string,gap,end_with):
-    """
-    切割字符串
-    :param input_string:
-    :param count:
-    :param end_with:
-    :return:
-    """
-    print(len(input_string))
-    start = 0
-    results = []
-    for index, char in enumerate(input_string):
-        if (index-start) > (gap-50):
-            if char == end_with:
-                results.append(input_string[start:index+1])
-                start = index+1
-                continue
-            if (index-start) == gap:
-                results.append(input_string[start:index+1])
-                start = index + 1
-                continue
-        if index == len(input_string)-1:
-            results.append(input_string[start:index+1])
-    return results
+    def apply_alias_fanqie(self,bookid, alias_name):
+        url = 'https://kol.fanqieopen.com/api/platform/promotion/plan/create/v:version?app_id=457699&msToken=UEZMgJ5KwQVzidk0KggLrUssZyU04vT7U1plZbVyVYAGOARpVZ6GUj44oLQuwXHUkaxvTxbNIBvvVJgiQDsdjF32iiUiw_yUoO4zAW51Kmhct4UcglSE-5J3aA7kJi5E&X-Bogus=DFSzswVLwTKVD4XYtEQdzjLNKBT/'
+        payload = '{"book_id":"' + str(bookid) + '","alias_type":1,"alias_name":"' + alias_name + '"}'
+        payload = payload.encode('UTF-8')
+        response = requests.request("POST", url, headers=self.headers, data=payload)
+        if response.status_code == 200:
+            print(response.text)
 
-
-def remove_non_utf8(s):
-    # 尝试将字符串编码为UTF-8，如果失败则捕获UnicodeEncodeError异常
-    try:
-        s.encode(encoding='utf-8')
-        return s
-    except UnicodeEncodeError:
-        return ''
-
-def trim(s):
-    s.replace('*','')
-    return s
 
 
 if __name__ == '__main__':
-    pass
+    crawler = fanqie_crawler()
+    crawler.turn_back(bookid=7173533120174492704,video_id=7364218817570000138)
 
 # #########短篇
 #     bookids = [7329015211099161150]

@@ -9,7 +9,7 @@ coding:utf-8
 
 
 
-class crawler(object):
+class crawler():
     """
     爬虫基类，爬取各个网站网站的信息
     """

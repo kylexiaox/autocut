@@ -6,8 +6,10 @@ coding:utf-8
 @Email: btxiaox@gmail.com
 @Description:
 '''
+import string
+import unicodedata
 
-from crawler.fanqie_crawler import *
+from crawler.fanqie_crawler import fanqie_crawler
 from crawler.dub import *
 from video_autocut import *
 from moviepy.audio.fx.volumex import volumex
@@ -23,7 +25,8 @@ def assembler(bookid, bgm_name, alias,publish_time, content_type=0, voice_type='
     # # push_to_media(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》", publish_time=publish_time)
     # push_to_message_queue(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》", publish_time=publish_time)
     # 获取内容音频
-    audio_clip, srt_path, book_name = get_text_voice(bookid, content_type=content_type, voice_type=voice_type,flag= False)
+    fq_crawler = fanqie_crawler()
+    audio_clip, srt_path, book_name = get_text_voice(fq_crawler,bookid, content_type=content_type, voice_type=voice_type,flag= False)
     # 音量标准化
     audio_clip = audio_clip.audio_normalize()
     video_len = audio_clip.duration
@@ -56,6 +59,11 @@ def assembler(bookid, bgm_name, alias,publish_time, content_type=0, voice_type='
     c_time = str(time.time()).split('.')[0]
     output_path = os.path.join(output_folder, str(bookid) + '_' + bgm_name + '.mp4')
     # 确保输出文件夹路径存在，如果不存在则创建
+    print('处理简介摘要')
+    with open(output_folder + '/' + book_name + '_text.txt', 'r') as file:
+        # 读取文件内容
+        description = get_text_before_dot(file.read(),count=4)
+
     print('输出目录为 : ' + output_path)
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -69,12 +77,12 @@ def assembler(bookid, bgm_name, alias,publish_time, content_type=0, voice_type='
     get_cover_img(text=f"《{alias}》",w_l_ratio = final_clip.size[0]/final_clip.size[1], img=cover_img, output_folder=output_folder )
     # push_to_media(account='account',filepath=output_folder,title=f"番茄小说sou：《{alias}》",publish_time= publish_time)
     push_to_message_queue(account='account', filepath=output_folder, title=f"番茄小说sou：《{alias}》",
-                          publish_time=publish_time)
+                          publish_time=publish_time,description=description,content_type='short_novel')
 
     return output_path
 
 
-def get_text_voice(bookid, content_type=0, voice_type='female', flag=False):
+def get_text_voice(crawler,bookid, content_type=0, voice_type='female', flag=False):
     """
     通过bookid拿音频+字幕
     :param bookid:
@@ -86,9 +94,9 @@ def get_text_voice(bookid, content_type=0, voice_type='female', flag=False):
     if content_type == 0:
         # 短篇
         print(f"获取音频文件：{bookid}")
-        bookinfo = get_book_info(bookid)
-        text = get_content_from_fanqie_dp(bookid)
-        texts = split_content(text, gap=6000, end_with='。')
+        bookinfo = crawler.get_book_info(bookid)
+        text = crawler.get_content_from_fanqie_dp(bookid)
+        texts = utils.split_content(text, gap=6000, end_with='。')
         paths = []
         for index, text in enumerate(texts):
             paths.append(dubbing_for_long(long_text=text, result_filename=str(bookinfo[0]) + '_' + str(index),
@@ -101,9 +109,9 @@ def get_text_voice(bookid, content_type=0, voice_type='female', flag=False):
         final_output_folder = config.result_directory + '/' + str(bookid) + '_' + bookinfo[0]
         # 获取摘要
         abstract = bookinfo[0]
-        if count_chinese_characters(abstract) < 20:
+        if utils.count_chinese_characters(abstract) < 20:
             # 如果当前摘要小于20个字，得从正文中截取
-            abstract = split_content(text,gap=30,end_with='。')[0]
+            abstract = utils.split_content(text,gap=30,end_with='。')[0]
         if not os.path.exists(final_output_folder):
             os.makedirs(final_output_folder)
         with open(config.audio_directory_short + bookinfo[0] + '_info.txt', 'wb') as file:
@@ -136,19 +144,26 @@ def get_text_voice(bookid, content_type=0, voice_type='female', flag=False):
 
 def add_srt_to_video(srt_file, video_clip, font="/Users/xiangxiao/Documents/Fonts/yezigongchanghuajuanti.ttf"):
     print(f'添加字幕文件到视频中，字幕文件{srt_file}')
+    with open(srt_file, "r") as input_f, open('temp_srt.srt', "w") as output_f:
+        lines = input_f.readlines()
+        for i in range(0, len(lines), 4):
+            index = lines[i]
+            time = lines[i + 1]
+            content = lines[i + 2]
+            # 剔除字幕内容中的标点符号
+            content = filter_non_chinese(content)
+            # 写回到新文件中
+            output_f.write(index)
+            output_f.write(time)
+            output_f.write(content+'\n')
+            output_f.write("\n")
+
     def generate_text(txt):
-        txt = filter_non_chinese_and_digits(txt)
+        txt = filter_non_chinese(txt)
         return TextClip(txt, font=font, fontsize=30, color='white', stroke_color='black', stroke_width=1,
                         method='caption', size=(450, None))
 
-    subtitles = SubtitlesClip(srt_file, generate_text)
-    filtered_subtitles = []
-    for subtitle in subtitles:
-        time_gap, text = subtitle
-        filtered_text = filter_non_chinese_and_digits(text)
-        filtered_subtitles.append((time_gap, filtered_text))
-    # 保存新的字幕文件
-    filtered_subtitles_clip = SubtitlesClip(filtered_subtitles)
+    subtitles = SubtitlesClip('temp_srt.srt', generate_text)
     result = CompositeVideoClip([video_clip, subtitles.set_position(('center', 650), relative=False)])
     # 输出结果视
     # result.write_videofile("output.mp4",fps=video_clip.fps)
@@ -197,10 +212,11 @@ def merge_srt(srts):
 
 
 # 过滤非中文字符和阿拉伯数字
-def filter_non_chinese_and_digits(text):
+def filter_non_chinese(text):
     filtered_text = ''
     for char in text:
-        if '\u4e00' <= char <= '\u9fff' or not char.isdigit():  # 判断字符是否为中文或非数字
+        category = unicodedata.category(char)[0]
+        if category == 'L':  # L 类别表示字母
             filtered_text += char
     return filtered_text
 
@@ -254,26 +270,39 @@ def push_to_media(account,filepath,title,publish_time,img_path=None,type='douyin
     print(response.text)
 
 
-def push_to_message_queue(account,filepath,title,publish_time,img_path=None,type='douyin_short'):
+def push_to_message_queue(book_name,book_id,content_type,account,filepath,title,description,publish_time,img_path=None,type='douyin_short',platform='fanqie'):
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     # 生成唯一的uuid
     if img_path is None:
         img_path = filepath+'/'+"cover.png"
-    with open(filepath+'/'+'abstract.txt', 'r') as file:
-        # 读取文件内容
-        description = file.read()
+
     form = {
+        'book_id':book_id,
+        'book_name':book_name,
         'account':account,
         'filepath':filepath,
         'title':title,
         'type':type,
         'description':description,
         'img_path':img_path,
-        'publish_time':publish_time
+        'platform': platform,
+        'publish_time':publish_time,
+        'content_type':content_type
     }
     message_id = r.xadd("task_queue", form)
     print(f"发送数据id：{message_id},消息： {form}")
 
+
+def get_text_before_dot(text,count):
+    dot_count = 0
+    index = 0
+    for i, char in enumerate(text):
+        if char == '。':
+            dot_count += 1
+            if dot_count == count:
+                index = i
+                break
+    return text[:index]
 
 
 if __name__ == '__main__':
@@ -319,5 +348,5 @@ if __name__ == '__main__':
     #                  font='/Users/xiangxiao/Documents/Fonts/字魂劲道黑.ttf')
     # add_label_to_video(text = '🍅小说sou:《美女爱上我》',pic_file='fanqie.png',font='/Users/xiangxiao/Documents/Fonts/字魂劲道黑.ttf')
 
-    output_path = assembler(bookid=7345285799862075929, bgm_name='冬眠', voice_type='female', video_type='迷你厨房',
-                            alias='胖妹日记',publish_time='2024-05-01 16:00')
+    output_path = assembler(bookid=7301877628695219240, bgm_name='悬溺', voice_type='female', video_type='迷你厨房',
+                            alias='无良老公',publish_time='2024-05-03 17:00')

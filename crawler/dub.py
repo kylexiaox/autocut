@@ -11,7 +11,7 @@ coding:utf-8
 import os
 
 import requests
-from fanqie_crawler import *
+from crawler.fanqie_crawler import *
 import json
 from Crypto.Cipher import AES
 import base64
