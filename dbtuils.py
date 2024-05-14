@@ -10,6 +10,7 @@ coding:utf-8
 
 import pymysql
 from config import *
+import config
 
 
 def singleton(cls, *args, **kwargs):
@@ -31,12 +32,12 @@ class DButils():
         self.db = pymysql.connect(**DB_CONFIG)
         self.cursor = self.db.cursor()
         self.cursor_d = self.db.cursor(cursor=pymysql.cursors.DictCursor)
-        sql_database = 'use ts_stock;'
+        sql_database = 'use douyin;'
         self.cursor.execute(sql_database)
 
     def refresh(self):
         try:
-            sql_database = 'use ts_stock;'
+            sql_database = f'use douyin;'
             self.cursor.execute(sql_database)
             print('database connection is ok')
         except Exception as e:

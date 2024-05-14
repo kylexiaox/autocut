@@ -6,6 +6,8 @@ coding:utf-8
 @Email: btxiaox@gmail.com
 @Description:
 '''
+import unicodedata
+import logger
 
 
 def count_chinese_characters(input_string):
@@ -24,7 +26,7 @@ def split_content(input_string,gap,end_with):
     :param end_with:
     :return:
     """
-    print(len(input_string))
+    logger.assemble_logger.info('内容总字符数为：'+str(len(input_string)))
     start = 0
     results = []
     for index, char in enumerate(input_string):
@@ -53,3 +55,23 @@ def remove_non_utf8(s):
 def trim(s):
     s.replace('*','')
     return s
+
+def get_text_before_dot(text, count):
+    dot_count = 0
+    index = 0
+    for i, char in enumerate(text):
+        if char == '。':
+            dot_count += 1
+            if dot_count == count:
+                index = i
+                break
+    return text[:index]
+
+# 过滤非中文字符和阿拉伯数字
+def filter_non_chinese(text):
+    filtered_text = ''
+    for char in text:
+        category = unicodedata.category(char)[0]
+        if category == 'L':  # L 类别表示字母
+            filtered_text += char
+    return filtered_text

@@ -17,6 +17,7 @@ from Crypto.Cipher import AES
 import base64
 import time
 import config
+import logger
 
 
 headers = {
@@ -44,7 +45,7 @@ key = 'abcdefgabcdefg12'
 
 
 
-def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8,output_dir = None,flag = False,srt = False):
+def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8,output_dir = None,use_cache = False,srt = False):
     """
     content_type = 8 为短片，0为长篇
     flag  为存量拉取,true 为存量拉取，不访问无网络，false为访问网络
@@ -66,7 +67,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
         elif content_type == 0:
             output_dir = config.audio_directory_long
 
-    if flag is True:
+    if use_cache is True and os.path.exists(output_dir + '/' +result_filename + '.mp3'):
         return output_dir + '/' +result_filename + '.mp3',output_dir+'/' +result_filename+'.srt'
 
 
@@ -85,9 +86,9 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     payload_get_taskid = payload_get_taskid.encode('UTF-8')
     response = requests.request("POST", get_taskid_url, headers=headers, data=payload_get_taskid)
     if response.status_code == 200:
-        print(response.content.decode('UTF-8'))
+        logger.assemble_logger.info('返回任务id对象：'+ response.content.decode('UTF-8'))
         taskId = json.loads(response.content.decode('UTF-8'))['data']
-        print(taskId)
+        logger.assemble_logger.info('taskid 为：'+taskId)
     else:
         return 0
     payload_get_data = '{"taskId":"'+taskId+'"}'
@@ -96,7 +97,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     response = requests.request("POST", get_data_url, headers=headers, data=payload_get_data)
     if response.status_code == 200:
         data = json.loads(response.content.decode('UTF-8'))['data']
-        print(data)
+        logger.assemble_logger.info('通过taskid拿到的解密前对象为：'+data)
     cipher = AES.new(key.encode('UTF-8'),mode=AES.MODE_ECB)
     audio_url = cipher.decrypt(base64.b64decode(data))
     response = requests.get(url=audio_url,headers=headers)
@@ -106,10 +107,10 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
         audio_path = output_dir + '/' +result_filename + '.mp3'
         with open(audio_path, 'wb') as file:
             file.write(response.content)
-        print(f'音乐文件已成功下载到: {result_filename}')
+        logger.assemble_logger.info(f'音乐文件已成功下载到: {result_filename}')
 
     else:
-        print(f'下载失败，状态码: {response.status_code}')
+        logger.assemble_logger.error(f'下载失败，状态码: {response.status_code}')
         return 0
     #### 获取字幕
     ## 先拿 taskid
@@ -117,6 +118,10 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     payload_srt_id = payload_srt_id.encode('UTF-8')
     response = requests.request("POST",url=get_srt_id_url,headers=headers,data=payload_srt_id)
     if response.status_code ==200:
+        code = json.loads(response.content.decode('UTF-8'))['code']
+        if code == 1002:
+            msg = json.loads(response.content.decode('UTF-8'))['data']['msg']
+            raise Exception(code,msg)
         srt_taskid = json.loads(response.content.decode('UTF-8'))['data']
     ## 再拿字幕，需要循环
     payload_srt = '{"taskId":"'+srt_taskid+'","web":true,"textLength":null,"openConfiguration":null,"leaveBlank":true}'
@@ -124,7 +129,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     while(counter<20):
         response = requests.request(method='POST',url=get_srt_url,data=payload_srt,headers=headers)
         if response.status_code == 200:
-            print(response.content.decode('UTF-8'))
+            logger.assemble_logger.info('字幕请求返回信息：'+response.content.decode('UTF-8'))
             data = json.loads(response.content.decode('UTF-8'))['data']
             if data['status'] == 1:
                 srt_downlaod_url = data['srtUrl']
@@ -132,7 +137,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
                 srt_path = output_dir+'/' +result_filename+'.srt'
                 with open(srt_path, 'wb') as file:
                     file.write(srt_response.content)
-                print(f"文件 '{result_filename+'.srt'}' 下载成功！")
+                logger.assemble_logger.info(f"文件 '{result_filename+'.srt'}' 下载成功！")
                 break
             else:
                 counter += 1
