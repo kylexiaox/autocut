@@ -42,7 +42,7 @@ def retry(max_retries=3, delay=1):
     return decorator
 
 
-def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, voice_type='female', bgm_volume=0.15,
+def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, voice_type='female',
               video_type='西餐美食小吃视频', platform='fanqie',
               bitrate='3000k', cover_img='girl1_large', is_test=False):
     # 获取内容音频
@@ -60,6 +60,10 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
         bgm_clip = concatenate_audioclips([bgm_clip, tmp_bgm_clip])
     else:
         bgm_clip = bgm_clip.subclip(t_start=0, t_end=video_len)
+    if config.bgm_volume.get(bgm_name) is None:
+        bgm_volume = config.bgm_volume.get(bgm_name)
+    else:
+        bgm_volume = config.bgm_volume.get('default')
     bgm_clip = bgm_clip.fx(volumex, bgm_volume)
 
     logger.assemble_logger.info(f'处理音频，合并BGM和内容音频')
@@ -87,9 +91,10 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     output_path = os.path.join(output_folder, str(bookid) + '_' + bgm_name + '.mp4')
     # 确保输出文件夹路径存在，如果不存在则创建
     logger.assemble_logger.info('处理简介摘要')
-    with open(output_folder + '/' + book_name + '_text.txt', 'r') as file:
+    with open(output_folder + '/' + book_name + '_original_text.txt', 'r') as file:
         # 读取文件内容
-        description = get_text_before_dot(file.read(), count=4)
+        description = file.read()
+        description = get_text_before_dot(description, count=4)
     logger.assemble_logger.info('处理title')
     title_str = config.title_str.get(platform) + '《' + alias + '》'
     logger.assemble_logger.info('输出目录为 : ' + output_path)
@@ -140,14 +145,13 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
             return audio_clip, srt_path, bookinfo[0]
         logger.assemble_logger.info(f"获取音频文件：{bookid}")
         bookinfo = crawler.get_book_info(bookid)
-        text = crawler.get_content_from_fanqie_dp(bookid)
-        text = clean_the_text(text)
-        text = filter_non_chinese(text)
+        origin_text = crawler.get_content_from_fanqie_dp(bookid)
+        cleand_text = clean_the_text(origin_text)  # 去除第一章、1,等内容
         if is_test:
             # 测试环境中只保留100字
-            text = text[:100]
+            cleand_text = cleand_text[:100]
 
-        texts = split_content(text, gap=6000, end_with='。')
+        texts = split_content(cleand_text, gap=6000, end_with='。')
         paths = []
         for index, text in enumerate(texts):
             paths.append(dubbing_for_long(long_text=text, result_filename=str(bookinfo[0]) + '_' + str(index),
@@ -169,6 +173,8 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         with open(os.path.join(final_output_folder, bookinfo[0] + '_info.txt'), 'wb') as file:
             file.write(info_str.encode('UTF-8'))
         with open(os.path.join(final_output_folder, bookinfo[0] + '_text.txt'), 'wb') as file:
+            file.write(text.encode('UTF-8'))
+        with open(os.path.join(final_output_folder, bookinfo[0] + '_original_text.txt'), 'wb') as file:
             file.write(text.encode('UTF-8'))
         with open(config.audio_directory_short + bookinfo[0] + '_text.txt', 'wb') as file:
             file.write(text.encode('UTF-8'))
@@ -198,7 +204,7 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
 def add_srt_to_video(srt_file, video_clip, video_type):
     srt_config = config.video_setting.get(video_type).get('srt')
     logger.assemble_logger.info(f'添加字幕文件到视频中，字幕文件{srt_file}')
-    with open(srt_file, "r") as input_f, open('../temp_srt.srt', "w") as output_f:
+    with open(srt_file, "r") as input_f, open('temp_srt.srt', "w") as output_f:
         lines = input_f.readlines()
         for i in range(0, len(lines), 4):
             index = lines[i]
@@ -223,6 +229,8 @@ def add_srt_to_video(srt_file, video_clip, video_type):
     # subtitles = subtitles.set_text_generator(generate_text)
     subtitles = SubtitlesClip('temp_srt.srt', generate_text)
     result = CompositeVideoClip([video_clip, subtitles.set_position(srt_config.get('srt_position'), relative=False)])
+    # 删除temp srt内容
+    os.remove('temp_srt.srt')
     # 输出结果视
     # result.write_videofile("output.mp4",fps=video_clip.fps)
     return result
@@ -405,10 +413,19 @@ if __name__ == '__main__':
     # video_output(account_name='douyin_nv1', bookid=7322348136427424830,
     #              publish_time='2024-05-14 11:00',)
 
-    video_output(account_name='douyin_nv1', bookid=7301877628695219240,
-                 publish_time='2024-05-14 18:00', bgm_name='暖一杯茶')
-    video_output(account_name='douyin_nv1', bookid=7264865084881505314,
-                 publish_time='2024-05-15 11:00')
+    # video_output(account_name='douyin_nv1', bookid=7301877628695219240,
+    #              publish_time='2024-05-14 18:00', bgm_name='暖一杯茶')
+    # video_output(account_name='douyin_nv1', bookid=7264865084881505314,
+    #              publish_time='2024-05-15 11:00')
+    # video_output(account_name='douyin_nv1', bookid=7348385435980153406,
+    #              publish_time='2024-05-16 12:00')
+
+    video_output(account_name='douyin_nv1', bookid=7220620727366454284,bgm_name='用情',
+                 publish_time='2024-05-19 10:00')
+    # video_output(account_name='douyin_nv1', bookid=7362947113803579966,bgm_name='梦回仙游',
+    #              publish_time='2024-05-19 14:00')
+    # video_output(account_name='douyin_nv1', bookid=7281033423756460585,bgm_name='凄美地',
+    #              publish_time='2024-05-19 19:00')
 
     # assembler(bookid=7355507776015043646, bgm_name='凄美地', voice_type='male', video_type='蛋仔素材',
     #           alias=crawler.ge, publish_time='2024-05-12 10:00', account=config.account.get('douyin_nan1'),

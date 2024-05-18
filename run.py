@@ -6,7 +6,6 @@ coding:utf-8
 @Email: btxiaox@gmail.com
 @Description:
 '''
-import dbutils.steady_db
 
 from crawler.fanqie_crawler import *
 from datetime import datetime
@@ -43,7 +42,7 @@ def get_unturnover_video():
 
 def hourly_task():
     print("Hourly task executed!")
-    schedule.every().minute.do(get_unturnover_video)
+    schedule.every().hour.do(get_unturnover_video)
 
     while True:
         schedule.run_pending()

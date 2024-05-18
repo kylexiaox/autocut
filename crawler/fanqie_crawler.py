@@ -19,6 +19,12 @@ import logger
 
 
 def retry(max_retries=3, delay=1):
+    """
+    重试decorate 方法
+    :param max_retries:
+    :param delay:
+    :return:
+    """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -50,6 +56,7 @@ class fanqie_crawler(crawler.crawler):
     @retry()
     def get_book_info(self,book_id,content_type = 8):
         '''
+        拿书籍信息
         :param book_id:
         :param content_type: 0是长篇，8是短片
         :return:
@@ -64,7 +71,12 @@ class fanqie_crawler(crawler.crawler):
 
     @retry()
     def get_first_itemid(self,book_id):
-        # 拿第一章
+        """
+        拿第一章
+        :param book_id:
+        :return:
+        """
+
         url = 'https://kol.fanqieopen.com/api/platform/content/chapter/list/v:version?book_id='+str(book_id)+'&page_index=0&page_size=500&content_tab=2&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
         payload = {}
         response = requests.request("GET", url, headers=self.headers, data=payload)
@@ -76,7 +88,11 @@ class fanqie_crawler(crawler.crawler):
 
     @retry()
     def get_items(self,book_id):
-        # 拿所有的章节列表，返回json对象
+        """
+        拿所有的章节列表，返回json对象
+        :param book_id:
+        :return:
+        """
         url = 'https://kol.fanqieopen.com/api/platform/content/chapter/list/v:version?book_id='+str(book_id)+'&page_index=0&page_size=500&content_tab=2&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
         payload = {}
         response = requests.request("GET", url, headers=self.headers, data=payload)
@@ -87,6 +103,11 @@ class fanqie_crawler(crawler.crawler):
 
     @retry()
     def get_content_from_fanqie_dp(self,book_id):
+        """
+        拿短篇内容
+        :param book_id:
+        :return:
+        """
         item_id = self.get_first_itemid(book_id)
         url = 'https://kol.fanqieopen.com/api/platform/content/chapter/detail/v:version?book_id='+str(book_id)+'&item_id='+item_id+'&content_tab=2&app_id=457699&msToken='+self.ms_token+'&X-Bogus='+self.x_bogus
         payload = {}
@@ -105,6 +126,11 @@ class fanqie_crawler(crawler.crawler):
 
     @retry()
     def get_content_from_fanqie_long(self,book_id):
+        """
+        拿长篇内容
+        :param book_id:
+        :return:
+        """
         items = self.get_items(book_id)
         re_texts = []
         for item in items:
@@ -128,6 +154,13 @@ class fanqie_crawler(crawler.crawler):
 
     @retry()
     def turn_back(self,book_id,alias,video_id):
+        """
+        回填内容链接
+        :param book_id:
+        :param alias:
+        :param video_id:
+        :return:
+        """
         alais, alais_id = self.get_alias_id(book_id=book_id,alias=alias)
         if alais_id is None:
             return False
@@ -151,6 +184,12 @@ class fanqie_crawler(crawler.crawler):
 
     @retry()
     def get_alias_id(self,book_id,alias=None):
+        """
+        获得 bookid、alias 相关的 aliasid，这里alias和aliasid是两件事
+        :param book_id:
+        :param alias:
+        :return:
+        """
         url = f'https://kol.fanqieopen.com/api/platform/promotion/plan/list/v:version?book_id={str(book_id)}&task_type=1&page_index=0&page_size=10&app_id=457699&msToken={self.ms_token}&X-Bogus={self.x_bogus}'
         response = requests.get(url,headers = self.headers)
         if response.status_code == 200:
@@ -176,15 +215,20 @@ class fanqie_crawler(crawler.crawler):
 
 
 
-
-
     def apply_alias_fanqie(self,bookid, alias_name):
+        """
+        申请别名
+        :param bookid:
+        :param alias_name:
+        :return:
+        """
         url = 'https://kol.fanqieopen.com/api/platform/promotion/plan/create/v:version?app_id=457699&msToken=UEZMgJ5KwQVzidk0KggLrUssZyU04vT7U1plZbVyVYAGOARpVZ6GUj44oLQuwXHUkaxvTxbNIBvvVJgiQDsdjF32iiUiw_yUoO4zAW51Kmhct4UcglSE-5J3aA7kJi5E&X-Bogus=DFSzswVLwTKVD4XYtEQdzjLNKBT/'
         payload = '{"book_id":"' + str(bookid) + '","alias_type":1,"alias_name":"' + alias_name + '"}'
         payload = payload.encode('UTF-8')
         response = requests.request("POST", url, headers=self.headers, data=payload)
         if response.status_code == 200:
             logger.assemble_logger.info(response.text)
+
 
 
 

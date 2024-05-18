@@ -103,9 +103,9 @@ video_setting = {
             'font_size': 35,
             'color': 'white',
             'stroke_color': 'black',
-            'stroke_width': 2,
+            'stroke_width': 1,
             'size': (450, None),
-            'srt_position': ('center', 550)
+            'srt_position': ('center', 570)
         },
         'bitrate': '3000k',
         'frag_dur': 30,
@@ -145,5 +145,10 @@ video_setting = {
         'new_resolution':(720,1280)
 
     }
+}
 
+## bgm 音量
+bgm_volume = {
+    'default': 0.15,
+    "用情": 0.13
 }
