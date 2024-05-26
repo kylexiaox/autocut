@@ -60,7 +60,7 @@ def get_text_before_dot(text, count):
     dot_count = 0
     index = 0
     for i, char in enumerate(text):
-        if char == '。':
+        if char == '。' or char == '？' or char == '！' or char == '.' or char == '?' or char == '!' or char == '；':
             dot_count += 1
             if dot_count == count:
                 index = i

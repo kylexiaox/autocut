@@ -126,12 +126,13 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     ## 再拿字幕，需要循环
     payload_srt = '{"taskId":"'+srt_taskid+'","web":true,"textLength":null,"openConfiguration":null,"leaveBlank":true}'
     counter = 0
+    logger.assemble_logger.info('请求字幕ing')
     while(counter<20):
         response = requests.request(method='POST',url=get_srt_url,data=payload_srt,headers=headers)
         if response.status_code == 200:
-            logger.assemble_logger.info('字幕请求返回信息：'+response.content.decode('UTF-8'))
             data = json.loads(response.content.decode('UTF-8'))['data']
             if data['status'] == 1:
+                logger.assemble_logger.info('请求字幕返回成功，下载ing')
                 srt_downlaod_url = data['srtUrl']
                 srt_response = requests.get(srt_downlaod_url)
                 srt_path = output_dir+'/' +result_filename+'.srt'
@@ -141,6 +142,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
                 break
             else:
                 counter += 1
+                logger.assemble_logger.info(f'字幕返回失败，重试，第{counter}次')
                 time.sleep(2)
                 continue
     return audio_path,srt_path

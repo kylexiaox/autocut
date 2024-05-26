@@ -191,7 +191,7 @@ def combineVideo(tim_len, video_type, frag_dur=30, speed=1, bitrate='3000k', cod
     :return: 文件名
     固定的时长的素材
     """
-    logger.assemble_logger.info('start combineVideo')
+    logger.assemble_logger.info('开始合并视频...')
     video_config = config.video_setting.get(video_type)
     context_path = video_config.get('path')
     frag_dur = video_config.get('frag_dur')
@@ -280,9 +280,10 @@ def combineVideo(tim_len, video_type, frag_dur=30, speed=1, bitrate='3000k', cod
             os.makedirs(output_folder)
         with open(os.path.join(output_folder, c_time + '.txt'), 'w') as file:
             file.write(filelog)
+        logger.assemble_logger.info('开始合并文件，输出中，请等待...')
         clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate, threads=24, fps=fps,
                              preset='medium', )
-        logger.assemble_logger.info('end combineVideo')
+        logger.assemble_logger.info('文件合并已结束')
         return output_path
     else:
         return clip, filelog

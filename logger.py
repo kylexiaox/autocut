@@ -13,6 +13,12 @@ import logging
 import logging.handlers
 from datetime import datetime
 import coloredlogs
+from queue import Queue
+
+import config
+
+# 创建一个队列，用于存储日志消息
+log_queue = Queue()
 
 
 def get_logger(name):
@@ -31,15 +37,7 @@ def get_logger(name):
     _logger.setLevel(logging.DEBUG)
 
     # 创建一个 coloredlogs 格式化器，并定义不同等级的颜色
-    formatter = coloredlogs.ColoredFormatter(
-        logger_format,
-        level_styles={
-            'info': {'color': 'green'},
-            'warning': {'color': 'yellow'},
-            'error': {'color': 'red'},
-            'critical': {'color': 'red', 'bold': True}
-        }
-    )
+    formatter = config.formatter
     # 按指定格式输出到文件
     file_name = os.path.join(log_dir, '{}.log'.format(name))
     fh = file_handler(file_name, formats)
@@ -47,6 +45,7 @@ def get_logger(name):
 
     # 按指定格式输出到控制台
     sh = stream_handler(formatter)
+
     _logger.addHandler(sh)
     fh.close()
     sh.close()
@@ -68,6 +67,24 @@ def stream_handler(formats):
     return stream_headler
 
 
+def web_handler(formats,handler):
+    web_handler = logging.StreamHandler()
+    web_handler.setLevel(logging.DEBUG)
+    web_handler.setFormatter(formats)
+
+    # 自定义处理方式，将日志消息发送到队列
+    def custom_emit(record):
+        handler.send_message(record.getMessage())
+    web_handler.emit = custom_emit
+    return web_handler
+
+def inject_web_handler(hanler):
+    wh = web_handler(config.formatter,hanler)
+    assemble_logger.addHandler(wh)
+    wh.close()
+
+
+
 def create_log_dir(log_dir):
     log_dir = os.path.expanduser(log_dir)
     if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
@@ -76,4 +93,5 @@ def create_log_dir(log_dir):
 
 
 assemble_logger = get_logger('assemble')
+putback_logger = get_logger('putback')
 

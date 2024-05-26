@@ -9,6 +9,8 @@ coding:utf-8
 
 
 import pymysql
+
+import logger
 from config import *
 import config
 
@@ -36,6 +38,7 @@ class DButils():
         self.cursor.execute(sql_database)
 
     def refresh(self):
+        logger.assemble_logger.info('refresh database connection')
         try:
             sql_database = f'use douyin;'
             self.cursor.execute(sql_database)

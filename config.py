@@ -8,6 +8,22 @@ coding:utf-8
 '''
 
 import time
+from pathlib import Path
+
+# 创建一个 coloredlogs 格式化器，并定义不同等级的颜色
+import coloredlogs
+
+logger_format = '%(asctime)s - %(filename)s - %(lineno)d - %(levelname)s -%(threadName)s - %(message)s'
+formatter = coloredlogs.ColoredFormatter(
+    logger_format,
+    level_styles={
+        'info': {'color': 'green'},
+        'warning': {'color': 'yellow'},
+        'error': {'color': 'red'},
+        'critical': {'color': 'red', 'bold': True}
+    }
+)
+
 
 audio_directory_long = "/Volumes/公共空间/小说推文/配音文件/长片"
 audio_directory_short = "/Volumes/公共空间/小说推文/配音文件/短片"
@@ -16,6 +32,8 @@ video_directory = "/Volumes/公共空间/小说推文/配音文件/短片"
 result_directory = "/Volumes/公共空间/小说推文/产出视频/成片/" + time.strftime("%Y-%m-%d", time.localtime())
 bgm_directory = "/Volumes/公共空间/小说推文/BGM素材/"
 
+# 基础目录
+BASE_DIR = Path(__file__).parent.resolve()
 
 cookies = {
     "kol_fanqie" : "n_mh=iY4X6u7l6MlRNo51VeHduV1Y0ma-JlIjJ0l81ei6IBA; store-region=cn-sh; store-region-src=uid; d_ticket=ce5993f0c541eb0b6af2e4f8d220a6da48599; ttwid=1%7CJEz5kjpZOJDvg3JhVOGnEV107VTNugJzNX0mlfKUJRU%7C1714931727%7C0ece76b799db50efb444270e363a19e712995246b1eb891c4bd9a7607796c8e7; s_v_web_id=verify_lvzghp82_ImANs182_P2hF_4fC5_824E_fUi3YJ6QYF56; msToken=j904jRZy1vz3xNKUZ2m5sPsddayluksILKZ0JiMQLP-I17tgvCP9iUdjPXws8qVvCBF6S_A3jKwSdc4rfXpKLHcbHkoUUPAPsb1p_3oV4YGLDgRv5gJg2ujIe3yMVTQ=; passport_csrf_token=f0f0863074b8fbae4b89fc4a9f6493ef; passport_csrf_token_default=f0f0863074b8fbae4b89fc4a9f6493ef; tt_scid=NfspgjuAHQmMyvsatYLOOiuHNJ0yOwgqpdXI2Uclkxv65fYmhXN3Y-TfhP4IYaH6f52d; odin_tt=7dc0f0ce9f12a4b23acc088dae94c72998bee6264874e225f868bf264754cff357476eaac1a6ca3c679c256d9545561905ba855463d7bbf5620a91743a6bc7cf; passport_auth_status=1ecd718170a6501be61234ccf6c8468d%2C; passport_auth_status_ss=1ecd718170a6501be61234ccf6c8468d%2C; sid_guard=70d3a16299c2f417320f2c6edbdd9c6a%7C1715271748%7C5183999%7CMon%2C+08-Jul-2024+16%3A22%3A27+GMT; uid_tt=7582de8723554ec088e94a6d8f017e87; uid_tt_ss=7582de8723554ec088e94a6d8f017e87; sid_tt=70d3a16299c2f417320f2c6edbdd9c6a; sessionid=70d3a16299c2f417320f2c6edbdd9c6a; sessionid_ss=70d3a16299c2f417320f2c6edbdd9c6a; sid_ucp_v1=1.0.0-KGE3NGFkMmE3YTMxOGI3MDc2MGE2ODJhYzkyZmQyNzg4MzdjMDRkMDUKIAigitDb3s2YBRDE8POxBhjj9xsgDDCZ7_qmBjgCQPEHGgJobCIgNzBkM2ExNjI5OWMyZjQxNzMyMGYyYzZlZGJkZDljNmE; ssid_ucp_v1=1.0.0-KGE3NGFkMmE3YTMxOGI3MDc2MGE2ODJhYzkyZmQyNzg4MzdjMDRkMDUKIAigitDb3s2YBRDE8POxBhjj9xsgDDCZ7_qmBjgCQPEHGgJobCIgNzBkM2ExNjI5OWMyZjQxNzMyMGYyYzZlZGJkZDljNmE; msToken=iZ_DmRs4GXZdvLO73U55bOzthrhFBNOU7yYoOkBI3uygjuPJJOGA3kYp7wdh_7NsUclWy51RyLWAdIHNeoHRfXTTIdL6K4G_Si1vYcrLe1yZHARf_z6DGnxFzDpt7xY="}
@@ -30,7 +48,7 @@ title_str = {
 }
 
 icon_file = {
-    'fanqie' :  'fanqie.png'
+    'fanqie' : BASE_DIR / 'icon_files' / 'fanqie.png'
 }
 
 font ={
@@ -63,7 +81,7 @@ account = {
         'video_type':'迷你厨房'
     },
     'douyin_nan1':{
-        'account_id': 47040731565,
+        'account_id': 30365867345,
         'cover_img':'girl2_large',
         'voice_type':'male',
         'video_type':'蛋仔素材'
@@ -122,7 +140,7 @@ video_setting = {
             'font_size': 70,
             'color': 'white',
             'stroke_color':'black',
-            'stroke_width':2,
+            'stroke_width':0,
             'size':(300, None),
             'pic_size':(60,60),
             'txt_position':('center', 250),
@@ -131,7 +149,7 @@ video_setting = {
         'srt': {
             'font': font.get('字魂劲道黑'),
             'font_size': 40,
-            'color': 'black',
+            'color': '#FF8247',
             'stroke_color': 'white',
             'stroke_width': 2,
             'size': (900, None),

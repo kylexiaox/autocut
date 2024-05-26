@@ -210,7 +210,7 @@ class fanqie_crawler(crawler.crawler):
                             alias_id = promotion['alias_id']
                             return alias, alias_id
             except Exception as e:
-                logger.assemble_logger.error(e)
+                logger.putback_logger.error(e)
                 return None
 
 
@@ -227,7 +227,7 @@ class fanqie_crawler(crawler.crawler):
         payload = payload.encode('UTF-8')
         response = requests.request("POST", url, headers=self.headers, data=payload)
         if response.status_code == 200:
-            logger.assemble_logger.info(response.text)
+            logger.putback_logger.info(response.text)
 
 
 

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Example</title>
+</head>
+<body>
+    <h1>选择内容剪辑</h1>
+    <form id="inputForm",method="post",onsubmit="return prepareForm()">
+        <label for="bookid">book_id:</label>
+        <input type="text" id="bookid" name="bookid">
+        <label for="bgm_name">选择BGM:</label>
+        <select id="bgm_name" name="bgm_name">
+            {% for value in bgm_options %}
+                <option value="{{ value }}">{{ value }}</option>
+            {% end %}
+        </select>
+<!--        <label for="bgm_name">bgm_name:</label>-->
+<!--        <input type="text" id="bgm_name" name="bgm_name">-->
+        <label>Publish Time:</label>
+        <input type="radio" id="immediatePublish" name="publish_mode" value="0" checked onclick="togglePublishTime()"> Immediate
+        <input type="radio" id="schedulePublish" name="publish_mode" value="schedule" onclick="togglePublishTime()"> Schedule
+        <br><br>
+        <div id="publishTimeDiv" style="display: none;">
+            <label for="publish_time">Publish Time:</label>
+            <input type="datetime-local" id="publish_time" name="publish_time" min="2000-01-01T00:00" max="2099-12-31T23:59" step="60">
+        </div>
+<!--        <label for="publish_time">Select publish time:</label>-->
+<!--        <input type="datetime-local" id="publish_time" name="publish_time" min="2000-01-01T00:00" max="2099-12-31T23:59" step="60">-->
+        <label for="account">选择账户:</label>
+        <select id="account" name="account">
+            {% for key, value in account_options.items() %}
+                <option value="{{ key }}">{{ key }}</option>
+            {% end %}
+        </select>
+        <button type="submit">提交</button>
+    </form>
+    <h3>Real-time Logging</h3>
+    <div id="logArea"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.0/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+
+        function togglePublishTime() {
+            const publishTimeDiv = document.getElementById('publishTimeDiv');
+            const scheduleRadio = document.getElementById('schedulePublish');
+            publishTimeDiv.style.display = scheduleRadio.checked ? 'block' : 'none';
+        }
+
+        function prepareForm() {
+            const immediateRadio = document.getElementById('immediatePublish');
+            const publishTimeInput = document.getElementById('publish_time');
+            if (immediateRadio.checked) {
+                publishTimeInput.value = '0';
+            }
+            return true;  // 允许表单提交
+        }
+        // 配置重新连接选项
+        const socket = io('http://localhost:8888', {
+          reconnection: true,         // 启用重新连接机制
+          reconnectionAttempts: 3,    // 最大尝试次数
+          reconnectionDelay: 1000,    // 重新连接延迟（毫秒）
+          reconnectionDelayMax: 5000  // 最大重新连接延迟（毫秒）
+        });
+
+        // 监听连接事件
+        socket.on('connect', () => {
+          console.log('Connected');
+        });
+
+        // 监听重新连接事件
+        socket.on('reconnect', (attemptNumber) => {
+          console.log(`Reconnected after ${attemptNumber} attempts`);
+        });
+
+        // 监听连接断开事件
+        socket.on('disconnect', () => {
+          console.log('Disconnected');
+        });
+        // 监听来自服务器的日志消息
+        socket.on('log_message', function(data) {
+            // 将日志消息添加到页面上
+            console.log('get message from server')
+            const logArea = document.getElementById('logArea');
+            const logMessage = document.createElement('p');
+            logMessage.textContent = data.message;
+            logArea.appendChild(logMessage);
+        });
+        document.getElementById('inputForm').addEventListener('submit', function(event) {
+            event.preventDefault();  // 阻止表单提交默认行为
+
+            // 获取表单数据
+            const formData = new FormData(this);
+            const bookid = formData.get('bookid');
+            const bgm_name = formData.get('bgm_name');
+            const publish_time = formData.get('publish_time');
+            const account = formData.get('account');
+            // 发送表单数据到服务器
+            socket.emit('form_data', { bookid: bookid, bgm_name: bgm_name, publish_time: publish_time, account: account });
+        });
+
+
+    </script>
+    <script>
+
+    </script>
+</body>
+</html>

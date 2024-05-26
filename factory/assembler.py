@@ -8,12 +8,16 @@ coding:utf-8
 '''
 import re
 import string
+import sys
+import os
+# 将外层目录添加到 sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import logger
-from utils import *
+from .utils import *
 from crawler.fanqie_crawler import fanqie_crawler
 from crawler.dub import *
-from video_autocut import *
+from .video_autocut import *
 from moviepy.audio.fx.volumex import volumex
 from moviepy.video.tools.subtitles import SubtitlesClip
 import pysrt
@@ -44,7 +48,7 @@ def retry(max_retries=3, delay=1):
 
 def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, voice_type='female',
               video_type='西餐美食小吃视频', platform='fanqie',
-              bitrate='3000k', cover_img='girl1_large', is_test=False):
+              bitrate='5000k', cover_img='girl1_large', is_test=False):
     # 获取内容音频
     fq_crawler = fanqie_crawler()
     audio_clip, srt_path, book_name = get_text_voice(fq_crawler, bookid, content_type=content_type,
@@ -60,15 +64,14 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
         bgm_clip = concatenate_audioclips([bgm_clip, tmp_bgm_clip])
     else:
         bgm_clip = bgm_clip.subclip(t_start=0, t_end=video_len)
-    if config.bgm_volume.get(bgm_name) is None:
+    if config.bgm_volume.get(bgm_name) is not None:
         bgm_volume = config.bgm_volume.get(bgm_name)
     else:
         bgm_volume = config.bgm_volume.get('default')
     bgm_clip = bgm_clip.fx(volumex, bgm_volume)
-
     logger.assemble_logger.info(f'处理音频，合并BGM和内容音频')
     overlay_audio_clip = CompositeAudioClip([audio_clip, bgm_clip])
-
+    overlay_audio_clip.fps = 44100
     logger.assemble_logger.info(f'合并解压视频素材')
     video_clip, filelog = combineVideo(tim_len=overlay_audio_clip.duration, frag_dur=None, speed=1,
                                        video_type=video_type,
@@ -104,20 +107,18 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
         file.write(filelog)
     fps = final_clip.fps
     final_clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate, fps=fps,
-                               preset='ultrafast', )
+                               preset='slow', )
     # medium
     logger.assemble_logger.info('视频文件写入完成')
     logger.assemble_logger.info("处理封面")
     get_cover_img(text=f"《{alias}》", w_l_ratio=final_clip.size[0] / final_clip.size[1], img=cover_img,
                   output_folder=output_folder)
     # push_to_media(account='account',filepath=output_folder,title=f"番茄小说sou：《{alias}》",publish_time= publish_time)
-    if is_test:
-        return output_path
-    push_to_message_queue(book_name=book_name, book_id=bookid, alias=alias, account=account, filepath=output_folder,
-                          title=title_str,
-                          publish_time=publish_time, description=description, content_type='short_novel')
-
-    return output_path
+    result = {'book_id': bookid, 'alias': alias, 'book_name': book_name, 'account': account, 'filepath': output_folder,'title': title_str,
+                'description': description,
+                'publish_time': publish_time, 'content_type': 'short_novel'}
+    logger.assemble_logger.info(f'处理完成，返回结果：{result}')
+    return result
 
 
 def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cache=True, is_test=False):
@@ -212,6 +213,9 @@ def add_srt_to_video(srt_file, video_clip, video_type):
             content = lines[i + 2]
             # 剔除字幕内容中的标点符号
             content = filter_non_chinese(content)
+            # 空串剔除
+            if content == '':
+                continue
             # 写回到新文件中
             output_f.write(index)
             output_f.write(time)
@@ -341,6 +345,22 @@ def push_to_media(account, filepath, title, publish_time, img_path=None, type='d
 
 def push_to_message_queue(book_name, book_id, content_type, alias, account, filepath, title, description, publish_time,
                           img_path=None, type='douyin_short', platform='fanqie'):
+    """
+
+    :param book_name: 书名
+    :param book_id: 书id
+    :param content_type:
+    :param alias: 别名
+    :param account: 抖音账户
+    :param filepath: 文件目录
+    :param title: 抖音标题
+    :param description: 抖音描述
+    :param publish_time:
+    :param img_path:
+    :param type: 定位到tags
+    :param platform:
+    :return:
+    """
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     # 生成唯一的uuid
     if img_path is None:
@@ -369,7 +389,8 @@ def push_to_mq_test(msg):
     logger.assemble_logger.info(f"测试发送数据id：{message_id},消息： {msg}")
 
 
-def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False):
+def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False,is_push=True):
+    logger.assemble_logger.info(f'开始处理任务：书籍id是：{bookid},发布时间：{publish_time},BGM：{bgm_name},发布到账户：{account_name}上....')
     if bgm_name is None:
         # 随机分配音乐
         bgm_dir = '/Volumes/公共空间/小说推文/BGM素材/'
@@ -381,8 +402,17 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
     voice_type = config.account.get(account_name).get('voice_type')
     cover_img = config.account.get(account_name).get('cover_img')
     video_type = config.account.get(account_name).get('video_type')
-    assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account=account, video_type=video_type,
-              cover_img=cover_img, publish_time=publish_time, alias=alias_name, is_test=is_test)
+    result = assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account=account, video_type=video_type,
+                      cover_img=cover_img, publish_time=publish_time, alias=alias_name, is_test=is_test)
+    # result = {'book_id': '7366551041162103833', 'alias': '打脸男闺蜜', 'book_name': '感化不了的妻子，我不要了', 'account': 30365867345, 'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-26/7366551041162103833_感化不了的妻子，我不要了', 'title': '🍅小说sou:《打脸男闺蜜》', 'description': '杀青庆功宴上，老婆把赞助商送的男款情侣表送给了前男友。二人拿着情侣表拍了张接吻照。大伙儿看了我一眼错愕的问她：“沈老师，你亲错人了吧？”“戏都拍完了，这是什么情况', 'publish_time': '0', 'content_type': 'short_novel'}
+    if is_push:
+        push_to_message_queue(book_name=result.get('book_name'), book_id=result.get('book_id'),
+                              content_type=result.get('content_type'), alias=result.get('alias'),
+                              account=result.get('account'), filepath=result.get('filepath'), title=result.get('title'),
+                              description=result.get('description'), publish_time=result.get('publish_time'),
+                              img_path=result.get('img_path'),)
+
+
 
 
 if __name__ == '__main__':
@@ -420,12 +450,18 @@ if __name__ == '__main__':
     # video_output(account_name='douyin_nv1', bookid=7348385435980153406,
     #              publish_time='2024-05-16 12:00')
 
-    video_output(account_name='douyin_nv1', bookid=7220620727366454284,bgm_name='用情',
-                 publish_time='2024-05-19 10:00')
-    # video_output(account_name='douyin_nv1', bookid=7362947113803579966,bgm_name='梦回仙游',
-    #              publish_time='2024-05-19 14:00')
-    # video_output(account_name='douyin_nv1', bookid=7281033423756460585,bgm_name='凄美地',
-    #              publish_time='2024-05-19 19:00')
+        # video_output(account_name='douyin_nv1', bookid=7369200831616254526, bgm_name='富士山下',
+        #              publish_time=None)
+        video_output(account_name='douyin_nan1', bookid=7366551041162103833, bgm_name='我离开了南京',
+                    publish_time='0')
+    # video_output(account_name='douyin_nan1', bookid=7330837915712359486,bgm_name='赤伶',
+    #           publish_time=None)
+    # video_output(account_name='douyin_nan1', bookid=7333102653397814334,bgm_name='凄美地',
+    #              publish_time='2024-05-25 11:00')
+    # video_output(account_name='douyin_nv1', bookid=7133640097534053406,bgm_name='悬溺',
+    #              publish_time='2024-05-24 11:00')
+    # video_output(account_name='douyin_nan1', bookid=7330837915712359486,bgm_name='赤伶',
+    #              publish_time='2024-05-23 11:30')
 
     # assembler(bookid=7355507776015043646, bgm_name='凄美地', voice_type='male', video_type='蛋仔素材',
     #           alias=crawler.ge, publish_time='2024-05-12 10:00', account=config.account.get('douyin_nan1'),
