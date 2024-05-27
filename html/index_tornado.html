@@ -63,6 +63,9 @@
             font-size: 14px;
             line-height: 1.4;
         }
+        .error {
+            color: red;
+        }
     </style>
 </head>
 <body>
@@ -92,6 +95,7 @@
         </select>
         <button type="submit">Submit</button>
     </form>
+    <p id="resultMessage"></p>
     <h3>Real-time Logging</h3>
     <div id="logArea"></div>
 </div>
@@ -112,12 +116,15 @@
         return true;  // Allow form submission
     }
 
+    // 生成一个唯一的 clientId（可以是 UUID 或其他唯一标识符）
+    const clientId = 'client_' + Math.random().toString(36).substr(2, 9);
+
     const socketProtocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-    const socketUrl = `${socketProtocol}//${window.location.host}/ws`;
+    const socketUrl = `${socketProtocol}//${window.location.host}/ws?clientId=${clientId}`;
     const socket = new WebSocket(socketUrl);
 
     socket.onopen = function() {
-        console.log('Connected');
+        console.log('Connected with clientId:', clientId);
     };
 
     socket.onclose = function() {
@@ -142,11 +149,21 @@
         const bgm_name = formData.get('bgm_name');
         const publish_time = formData.get('publish_time');
         const account = formData.get('account');
+        formData.append('clientId', clientId);
 
         fetch('/form', {
             method: 'POST',
             body: formData
-        });
+        }).then(response => response.json())
+          .then(data => {
+              console.log('Success:', data);
+              const resultMessage = document.getElementById("resultMessage");
+              resultMessage.textContent = data;
+              resultMessage.classList.add("error");  // Add 'error' class to make text red
+          })
+          .catch((error) => {
+              console.error('Error:', error);
+          });
     });
 </script>
 </body>

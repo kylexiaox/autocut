@@ -77,6 +77,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
         voice = malevoice
 
     get_taskid_url = "https://www.douge.club/peiyin/user/webNewSynGenerateVoiceNew"
+    get_taskid_url_backup = "https://www.douge.club/peiyin/user/webNewSynToGenerateVoice"
     get_data_url = 'https://www.douge.club/peiyin/user/getVoiceAudioUrlWeb'
     get_srt_id_url = 'https://www.douge.club/peiyin/user/analyzeAudioUrlWeb'
     get_srt_url = 'https://www.douge.club/peiyin/user/analyzeResultWeb'
@@ -85,12 +86,22 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
 
     payload_get_taskid = payload_get_taskid.encode('UTF-8')
     response = requests.request("POST", get_taskid_url, headers=headers, data=payload_get_taskid)
-    if response.status_code == 200:
-        logger.assemble_logger.info('返回任务id对象：'+ response.content.decode('UTF-8'))
-        taskId = json.loads(response.content.decode('UTF-8'))['data']
-        logger.assemble_logger.info('taskid 为：'+taskId)
-    else:
-        return 0
+    # 若 get_taskid_url 失败，尝试 get_taskid_url_backup
+    try:
+        if response.status_code == 200:
+            logger.assemble_logger.info('返回任务id对象：'+ response.content.decode('UTF-8'))
+            taskId = json.loads(response.content.decode('UTF-8'))['data']
+            logger.assemble_logger.info('taskid 为：'+taskId)
+        else:
+            return 0
+    except Exception as e:
+        logger.assemble_logger.error(f'获取任务id失败，错误信息：{e},尝试备用url')
+        response = requests.request("POST", get_taskid_url_backup, headers=headers, data=payload_get_taskid)
+        if response.status_code == 200:
+            taskId = json.loads(response.content.decode('UTF-8'))['data']
+            logger.assemble_logger.info('taskid 为：'+taskId)
+        else:
+            return 0
     payload_get_data = '{"taskId":"'+taskId+'"}'
     payload_get_data = payload_get_data.encode('UTF-8')
     time.sleep(120)

@@ -67,21 +67,27 @@ def stream_handler(formats):
     return stream_headler
 
 
-def web_handler(formats,handler):
+def web_handler(formats,handler,clientid):
     web_handler = logging.StreamHandler()
     web_handler.setLevel(logging.DEBUG)
     web_handler.setFormatter(formats)
-
+    web_handler.set_name(clientid)
     # 自定义处理方式，将日志消息发送到队列
     def custom_emit(record):
-        handler.send_message(record.getMessage())
+        handler.send_message(message=record.getMessage(),client_id=clientid)
     web_handler.emit = custom_emit
     return web_handler
 
-def inject_web_handler(hanler):
-    wh = web_handler(config.formatter,hanler)
+def inject_web_handler(hanler,clientid):
+    wh = web_handler(config.formatter,hanler,clientid)
     assemble_logger.addHandler(wh)
     wh.close()
+
+def revmove_web_handler(clientid):
+    for h in assemble_logger.handlers:
+        if h.name == clientid:
+            assemble_logger.removeHandler(h)
+            h.close()
 
 
 

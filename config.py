@@ -107,7 +107,7 @@ video_setting = {
         'path': '迷你厨房',
         'label': {
             'font':font.get('字魂大黑'),
-            'font_size': 10,
+            'font_size': 8,
             'color': 'black',
             'stroke_color': 'white',
             'stroke_width': 2,
@@ -118,7 +118,7 @@ video_setting = {
         },
         'srt': {
             'font': font.get('字小魂萌趣欢乐体'),
-            'font_size': 35,
+            'font_size': 30,
             'color': 'white',
             'stroke_color': 'black',
             'stroke_width': 1,
@@ -137,7 +137,7 @@ video_setting = {
         'path': '/蛋仔素材/2023年 6月-12月更新/竞速图',
         'label': {
             'font':font.get('字魂大黑'),
-            'font_size': 70,
+            'font_size': 65,
             'color': 'white',
             'stroke_color':'black',
             'stroke_width':0,
@@ -148,7 +148,7 @@ video_setting = {
         },
         'srt': {
             'font': font.get('字魂劲道黑'),
-            'font_size': 40,
+            'font_size': 35,
             'color': '#FF8247',
             'stroke_color': 'white',
             'stroke_width': 2,

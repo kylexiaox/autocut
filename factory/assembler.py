@@ -13,6 +13,8 @@ import os
 # 将外层目录添加到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import time
+import threading
 import logger
 from .utils import *
 from crawler.fanqie_crawler import fanqie_crawler
@@ -46,9 +48,36 @@ def retry(max_retries=3, delay=1):
     return decorator
 
 
+def log_progress(stop_event):
+    """
+    记录视频处理进度
+    :param stop_event:
+    :return:
+    """
+    while not stop_event.is_set():
+        logger.assemble_logger.info("Video processing in progress...")
+        stop_event.wait(15)  # 每隔 15 秒记录一次日志
+
+
 def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, voice_type='female',
               video_type='西餐美食小吃视频', platform='fanqie',
               bitrate='5000k', cover_img='girl1_large', is_test=False):
+    """
+    视频混剪函数，
+    :param bookid:
+    :param bgm_name:
+    :param alias:
+    :param publish_time:
+    :param account:
+    :param content_type:
+    :param voice_type:
+    :param video_type:
+    :param platform:
+    :param bitrate:
+    :param cover_img:
+    :param is_test:
+    :return:
+    """
     # 获取内容音频
     fq_crawler = fanqie_crawler()
     audio_clip, srt_path, book_name = get_text_voice(fq_crawler, bookid, content_type=content_type,
@@ -106,8 +135,17 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     with open(os.path.join(output_folder, c_time + '_' + str(bookid) + '_log.txt'), 'w') as file:
         file.write(filelog)
     fps = final_clip.fps
-    final_clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate, fps=fps,
-                               preset='slow', )
+    # 导出视频
+    stop_event = threading.Event()
+    threading.Thread(target=log_progress, args=(stop_event,)).start()
+    try:
+        final_clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate, fps=fps,
+                               preset='slow')
+    except Exception as e:
+        logger.assemble_logger.error(f'视频导出失败，错误信息：{e}', exc_info=True)
+        raise e
+    finally:
+        stop_event.set()
     # medium
     logger.assemble_logger.info('视频文件写入完成')
     logger.assemble_logger.info("处理封面")
@@ -146,13 +184,15 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
             return audio_clip, srt_path, bookinfo[0]
         logger.assemble_logger.info(f"获取音频文件：{bookid}")
         bookinfo = crawler.get_book_info(bookid)
-        origin_text = crawler.get_content_from_fanqie_dp(bookid)
-        cleand_text = clean_the_text(origin_text)  # 去除第一章、1,等内容
+        origin_summary,origin_content = crawler.get_content_from_fanqie_dp(bookid)
+        if origin_summary:
+            cleaned_summary = clean_the_text(origin_summary)
+        cleaned_text = clean_the_text(origin_content) # 去除第一章、1,等内容
         if is_test:
             # 测试环境中只保留100字
-            cleand_text = cleand_text[:100]
+            cleaned_text = cleaned_text[:100]
 
-        texts = split_content(cleand_text, gap=6000, end_with='。')
+        texts = split_content(cleaned_text, gap=6000, end_with='。')
         paths = []
         for index, text in enumerate(texts):
             paths.append(dubbing_for_long(long_text=text, result_filename=str(bookinfo[0]) + '_' + str(index),
@@ -162,8 +202,11 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         info_str = 'book_id : ' + str(bookinfo[2]) + '\n'
         info_str += 'book_name : ' + bookinfo[0] + '\n'
         info_str += 'abstract : ' + bookinfo[1]
-        # 获取摘要
-        abstract = bookinfo[0]
+        # 获取摘要,和拆分的summary做比对
+        if origin_summary is None:
+            abstract = bookinfo[0]
+        else:
+            abstract = cleaned_summary
         if count_chinese_characters(abstract) < 20:
             # 如果当前摘要小于20个字，得从正文中截取
             abstract = split_content(text, gap=30, end_with='。')[0]
@@ -287,8 +330,10 @@ def merge_srt(srts):
 
 
 def clean_the_text(text, ) -> string:
+    cleaned_text = ''.join([char for char in text if char != '"'])
+    cleaned_text = cleaned_text.replace('*','')
     # 使用正则表达式匹配 "第x章" 格式的内容，并将其替换为空字符串
-    cleaned_text = re.sub(r'(?<!第)第(?:[一二三四五六七八九十百千\d]+|[1-9]\d*)章', '', text)
+    # cleaned_text = re.sub(r'(?<!第)第(?:[一二三四五六七八九十百千\d]+|[1-9]\d*)章', '', cleaned_text)
     return cleaned_text
 
 
@@ -411,11 +456,16 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
                               account=result.get('account'), filepath=result.get('filepath'), title=result.get('title'),
                               description=result.get('description'), publish_time=result.get('publish_time'),
                               img_path=result.get('img_path'),)
+        return result
+    else:
+        logger.assemble_logger.info(f'测试环境，不推送到消息队列')
+        return result
 
 
 
 
 if __name__ == '__main__':
+    pass
     # push_to_mq_test({'book_id': 7348020574980951102, 'alias': '备胎日记', 'book_name': '不当舔狗后', 'account': 47040731565,
     #  'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后', 'title': '番茄小说sou：《备胎日记》',
     #  'type': 'douyin_short',
@@ -452,8 +502,8 @@ if __name__ == '__main__':
 
         # video_output(account_name='douyin_nv1', bookid=7369200831616254526, bgm_name='富士山下',
         #              publish_time=None)
-        video_output(account_name='douyin_nan1', bookid=7366551041162103833, bgm_name='我离开了南京',
-                    publish_time='0')
+        # video_output(account_name='douyin_nan1', bookid=7366551041162103833, bgm_name='我离开了南京',
+        #             publish_time='0')
     # video_output(account_name='douyin_nan1', bookid=7330837915712359486,bgm_name='赤伶',
     #           publish_time=None)
     # video_output(account_name='douyin_nan1', bookid=7333102653397814334,bgm_name='凄美地',

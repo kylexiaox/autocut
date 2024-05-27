@@ -6,18 +6,20 @@ coding:utf-8
 @Email: btxiaox@gmail.com
 @Description:
 '''
-# tornadoApp.py
-# tornadoApp.py
+
 
 import tornado.ioloop
 from tornado import gen
 from tornado.ioloop import PeriodicCallback
+from concurrent.futures import ThreadPoolExecutor
+from tornado.platform.asyncio import AnyThreadEventLoopPolicy
 import tornado.web
 import tornado.websocket
 import tornado.escape
 import os
 import sys
 import logger
+import asyncio
 from dbtuils import *
 import io
 import time
@@ -28,45 +30,78 @@ from factory.assembler import video_output
 from logger import *
 from config import *
 
+
 # WebSocket 处理程序
 class WebSocketHandler(tornado.websocket.WebSocketHandler):
-    clients = set()
+    clients = {}
 
     def open(self):
-        WebSocketHandler.clients.add(self)
-        print("WebSocket connection opened")
+        self.client_id = self.get_argument('clientId')
+        WebSocketHandler.clients[self.client_id] = self
+        print(f"WebSocket connection opened with clientId: {self.client_id}")
 
     def on_close(self):
-        WebSocketHandler.clients.remove(self)
-        print("WebSocket connection closed")
+        if self.client_id in WebSocketHandler.clients:
+            del WebSocketHandler.clients[self.client_id]
+        print(f"WebSocket connection closed for clientId: {self.client_id}")
 
     @classmethod
-    def send_message(cls, message):
-        for client in cls.clients:
+    def send_message(cls, client_id, message):
+        client = cls.clients.get(client_id)
+        if client:
             client.write_message(message)
+
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        bgms = [name for name in os.listdir(config.bgm_directory) if os.path.isdir(os.path.join(config.bgm_directory, name))]
+        bgms = [name for name in os.listdir(config.bgm_directory) if
+                os.path.isdir(os.path.join(config.bgm_directory, name))]
         self.render("index_tornado.html", account_options=config.account, bgm_options=bgms)
+
 
 class TaskListHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("Task list")
 
+
 class FormHandler(tornado.web.RequestHandler):
+    executor = ThreadPoolExecutor(max_workers=20)
+
+    @tornado.gen.coroutine
     def post(self):
-        book_id = self.get_argument('bookid')
-        bgm_name = self.get_argument('bgm_name')
-        account_name = self.get_argument('account')
-        publish_time = self.get_argument('publish_time').replace('T', ' ')
-        if publish_time != '0':
-            publish_time = publish_time.replace('T', ' ')
-        logger.inject_web_handler(WebSocketHandler)
-        WebSocketHandler.send_message(f"this is main thread {time.time()}")
-        logger.assemble_logger.info(f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
-        video_output(account_name, book_id, publish_time, bgm_name)
-        self.write("Task started")
+        try:
+            book_id = self.get_argument('bookid')
+            bgm_name = self.get_argument('bgm_name')
+            account_name = self.get_argument('account')
+            publish_time = self.get_argument('publish_time').replace('T', ' ')
+            client_id = self.get_argument('clientId')
+
+            if publish_time != '0':
+                publish_time = publish_time.replace('T', ' ')
+            logger.inject_web_handler(WebSocketHandler,client_id)
+            WebSocketHandler.send_message(client_id,f"this is main thread {time.time()}")
+            logger.assemble_logger.info(
+                f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
+            future = tornado.ioloop.IOLoop.current().run_in_executor(
+                self.executor,
+                video_output,
+                account_name,
+                book_id,
+                publish_time,
+                bgm_name,
+                False,  # 是否测试
+                True  # 是否需要推送到MQ
+            )
+            yield future  # 等待任务完成
+            self.write("Task successfully completed")
+        except Exception as e:
+            logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
+            self.write("Task Ended with Error")
+        finally:
+            logger.revmove_web_handler(client_id)
+            self.finish()
+
+
 
 
 def make_app():
@@ -76,7 +111,10 @@ def make_app():
         (r"/ws", WebSocketHandler),
     ], template_path=os.path.join(os.path.dirname(__file__), "html"))
 
+
 if __name__ == "__main__":
+    # 使用 AnyThreadEventLoopPolicy 确保在多线程中正确使用 asyncio
+    asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
     app = make_app()
     app.listen(8888)  # 监听端口 8888
     print("WebSocket server started at port 8888")

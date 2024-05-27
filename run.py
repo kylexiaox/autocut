@@ -11,6 +11,7 @@ from crawler.fanqie_crawler import *
 from datetime import datetime
 import schedule
 from dbtuils import *
+from factory import assembler
 
 
 
