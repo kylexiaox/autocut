@@ -23,6 +23,7 @@ def get_unturnover_video():
     sql = f'select * from {db_name} where is_turnback = 0'
     db.cursor.execute(sql)
     rs = db.cursor.fetchall()
+    logger.putback_logger.info(f'get %s unturnover video' % len(rs))
     for r in rs:
         id = r[0]
         send_time = r[1]
@@ -34,6 +35,7 @@ def get_unturnover_video():
             publish_time_str = send_time
         publish_time = datetime.strptime(publish_time_str,'%Y-%m-%d %H:%M:%S')
         if datetime.now() < publish_time:
+            logger.putback_logger.info(f'video %s,bookid %s is not published yet' % (video_id,book_id))
             continue
         logger.putback_logger.info(f'start putback video %s to the bookid %s in fanqie' % (video_id,book_id))
         result = crawler.turn_back(book_id=book_id,alias=alias, video_id=video_id)
@@ -47,7 +49,7 @@ def get_unturnover_video():
 
 def hourly_task():
     logger.putback_logger.info("Hourly task executed!")
-    schedule.every().hour.do(get_unturnover_video)
+    schedule.every().minutes.do(get_unturnover_video)
 
     while True:
         schedule.run_pending()

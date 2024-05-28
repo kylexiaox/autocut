@@ -25,6 +25,8 @@ import io
 import time
 
 # 添加项目根目录到 Python 路径
+from factory.dao import get_task_list
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'autocut')))
 from factory.assembler import video_output
 from logger import *
@@ -61,7 +63,15 @@ class MainHandler(tornado.web.RequestHandler):
 
 class TaskListHandler(tornado.web.RequestHandler):
     def get(self):
-        self.write("Task list")
+        account_name = self.get_argument('account_name',None)
+        gap_day = self.get_argument('gap_day',3)
+        if account_name is None:
+            task_list = None
+        else:
+            # 获取任务列表
+            task_list = get_task_list(gap_day, account_name)
+        self.render("task_list.html", task_list=task_list,account_name=account_name,gap_day=gap_day,account_options=config.account)
+
 
 
 class FormHandler(tornado.web.RequestHandler):
@@ -73,7 +83,9 @@ class FormHandler(tornado.web.RequestHandler):
             book_id = self.get_argument('bookid')
             bgm_name = self.get_argument('bgm_name')
             account_name = self.get_argument('account')
-            publish_time = self.get_argument('publish_time').replace('T', ' ')
+            publish_time = self.get_argument('publish_time')
+            if publish_time != '0':
+                publish_time = publish_time.replace('T', ' ')
             client_id = self.get_argument('clientId')
 
             if publish_time != '0':
@@ -109,6 +121,7 @@ def make_app():
         (r"/", MainHandler),
         (r"/form", FormHandler),
         (r"/ws", WebSocketHandler),
+        (r"/list", TaskListHandler),
     ], template_path=os.path.join(os.path.dirname(__file__), "html"))
 
 
