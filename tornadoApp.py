@@ -65,11 +65,13 @@ class TaskListHandler(tornado.web.RequestHandler):
     def get(self):
         account_name = self.get_argument('account_name',None)
         gap_day = self.get_argument('gap_day',3)
+        logger.assemble_logger.info(f'account_name:{account_name},gap_day:{gap_day}')
         if account_name is None:
             task_list = None
         else:
             # 获取任务列表
             task_list = get_task_list(gap_day, account_name)
+        logger.assemble_logger.info(f'get :{len(task_list)} items')
         self.render("task_list.html", task_list=task_list,account_name=account_name,gap_day=gap_day,account_options=config.account)
 
 
@@ -104,7 +106,11 @@ class FormHandler(tornado.web.RequestHandler):
                 False,  # 是否测试
                 True  # 是否需要推送到MQ
             )
-            yield future  # 等待任务完成
+            result = yield future  # 等待任务完成
+            if not result:
+                logger.assemble_logger.info(f'Task ended cause of duplicate')
+                return self.write("Task ended cause of duplicate")
+            logger.assemble_logger.info(f'Task successfully completed')
             self.write("Task successfully completed")
         except Exception as e:
             logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)

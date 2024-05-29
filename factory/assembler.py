@@ -27,6 +27,7 @@ from PIL import Image
 import redis
 from functools import wraps
 import time
+from factory import dao
 
 
 def retry(max_retries=3, delay=1):
@@ -405,6 +406,13 @@ def push_to_message_queue(book_name, book_id, content_type, alias, account, file
     :param type: 定位到tags
     :param platform:
     :return:
+    一个mq的消息包体
+    {'book_id': 7348020574980951102, 'alias': '备胎日记', 'book_name': '不当舔狗后', 'account': 47040731565,
+     'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后', 'title': '番茄小说sou：《备胎日记》',
+     'type': 'douyin_short',
+     'description': '在一起的第六年，我跟许钰提了分手。原因是我在她的车上看到了猫毛。而她从来不让我的猫上她的车，她说她有洁癖。听我这么说她无所谓的耸肩：[就因为这个？]因为这个，也不只因为是这个',
+     'img_path': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后/cover.png', 'platform': 'fanqie',
+     'publish_time': '2024-06-01 11:00', 'content_type': 'short_novel'}
     """
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     # 生成唯一的uuid
@@ -435,6 +443,9 @@ def push_to_mq_test(msg):
 
 
 def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False,is_push=True):
+    if dao.check_dumplicate(book_id=bookid, account_name=account_name):
+        logger.assemble_logger.info(f'video task is duplicate return False')
+        return False
     logger.assemble_logger.info(f'开始处理任务：书籍id是：{bookid},发布时间：{publish_time},BGM：{bgm_name},发布到账户：{account_name}上....')
     if bgm_name is None:
         # 随机分配音乐

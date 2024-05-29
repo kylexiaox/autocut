@@ -154,7 +154,7 @@
         fetch('/form', {
             method: 'POST',
             body: formData
-        }).then(response => response.json())
+        }).then(response => response.text()
           .then(data => {
               console.log('Success:', data);
               const resultMessage = document.getElementById("resultMessage");
@@ -163,7 +163,7 @@
           })
           .catch((error) => {
               console.error('Error:', error);
-          });
+          }));
     });
 </script>
 </body>
