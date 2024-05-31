@@ -118,7 +118,8 @@
 
     // 生成一个唯一的 clientId（可以是 UUID 或其他唯一标识符）
     const clientId = 'client_' + Math.random().toString(36).substr(2, 9);
-
+    let retryCount = 0;
+    const maxRetries = 5;
     const socketProtocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
     const socketUrl = `${socketProtocol}//${window.location.host}/ws?clientId=${clientId}`;
     const socket = new WebSocket(socketUrl);
@@ -129,6 +130,13 @@
 
     socket.onclose = function() {
         console.log('Disconnected');
+        if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
+                    setTimeout(connectWebSocket, 1000 * retryCount); // Exponential backoff
+                } else {
+                    console.error('Max retries reached. Unable to reconnect.');
+                }
     };
 
     socket.onmessage = function(event) {

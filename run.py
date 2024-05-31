@@ -32,6 +32,7 @@ def get_unturnover_video():
         publish_time_str = r[13]
         alias = r[9]
         if publish_time_str == '0':
+
             publish_time_str = send_time
         publish_time = datetime.strptime(publish_time_str,'%Y-%m-%d %H:%M:%S')
         if datetime.now() < publish_time:
@@ -47,9 +48,11 @@ def get_unturnover_video():
 
 
 
-def hourly_task():
+def schedual_task():
     logger.putback_logger.info("Hourly task executed!")
-    schedule.every().minutes.do(get_unturnover_video)
+    # 每五分钟执行一次
+    schedule.every(5).minutes.do(get_unturnover_video)
+
 
     while True:
         schedule.run_pending()
@@ -59,7 +62,8 @@ def hourly_task():
 
 
 if __name__ == '__main__':
-    hourly_task()
+    schedual_task()
+
     # get_unturnover_video()
 
     # crawler = fanqie_crawler()

@@ -25,10 +25,9 @@ import io
 import time
 
 # 添加项目根目录到 Python 路径
-from factory.dao import get_task_list
-
+from factory.dao import *
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'autocut')))
-from factory.assembler import video_output
+from factory.assembler import *
 from logger import *
 from config import *
 
@@ -67,7 +66,7 @@ class TaskListHandler(tornado.web.RequestHandler):
         gap_day = self.get_argument('gap_day',3)
         logger.assemble_logger.info(f'account_name:{account_name},gap_day:{gap_day}')
         if account_name is None:
-            task_list = None
+            task_list = []
         else:
             # 获取任务列表
             task_list = get_task_list(gap_day, account_name)
@@ -96,6 +95,15 @@ class FormHandler(tornado.web.RequestHandler):
             WebSocketHandler.send_message(client_id,f"this is main thread {time.time()}")
             logger.assemble_logger.info(
                 f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
+            # 封装task dict
+            task = {
+                'account_name': account_name,
+                'book_id': book_id,
+                'publish_time': publish_time
+            }
+            # 把task添加到列表里，并返回index
+            task_idx = tasks.push(task)
+            logger.assemble_logger.info(f'Task added to queue, index: {task_idx}')
             future = tornado.ioloop.IOLoop.current().run_in_executor(
                 self.executor,
                 video_output,
@@ -106,6 +114,7 @@ class FormHandler(tornado.web.RequestHandler):
                 False,  # 是否测试
                 True  # 是否需要推送到MQ
             )
+
             result = yield future  # 等待任务完成
             if not result:
                 logger.assemble_logger.info(f'Task ended cause of duplicate')
@@ -116,6 +125,8 @@ class FormHandler(tornado.web.RequestHandler):
             logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
             self.write("Task Ended with Error")
         finally:
+            tasks.pop(task_idx)
+            logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
             logger.revmove_web_handler(client_id)
             self.finish()
 
@@ -132,6 +143,7 @@ def make_app():
 
 
 if __name__ == "__main__":
+
     # 使用 AnyThreadEventLoopPolicy 确保在多线程中正确使用 asyncio
     asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
     app = make_app()
