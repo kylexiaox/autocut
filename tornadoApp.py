@@ -150,10 +150,10 @@ if __name__ == "__main__":
     app.listen(8888)  # 监听端口 8888
     print("WebSocket server started at port 8888")
     # 每小时轮询数据库
-    periodic_callback = PeriodicCallback(db.refresh, 3600000)
+    periodic_callback = PeriodicCallback(DButils().refresh, 3600000)
     periodic_callback.start()
 
     # 这里是检查标记的示例
-    tornado.ioloop.IOLoop.current().call_later(3600000, lambda: ("Database access completed:", db.refresh.completed))
+    tornado.ioloop.IOLoop.current().call_later(3600000, lambda: ("Database access completed:", DButils().refresh.completed))
 
     tornado.ioloop.IOLoop.current().start()

@@ -60,23 +60,30 @@ def get_task_list(gap_day=3, account_name=None,publish_type = None):
     """
     result = []
     # 去处已入库的任务，FROM DB
+
     # sql，取出最近days天的任务,对比字段是send_time,send_time的类型是字符串
     if publish_type is None or publish_type == 'published':
-        db_name = config.DB_NAME.get('video_record')
-        sql = f"SELECT * FROM {db_name}  WHERE DATEDIFF(CURDATE(), STR_TO_DATE(send_time, '%Y-%m-%d')) <= {gap_day} "
-        if account_name:
-            account_id = config.account.get(account_name).get('account_id')
-            sql += f"AND account_id = {account_id}"
-        # 按照时间降序排列
-        sql += " ORDER BY STR_TO_DATE(send_time, '%Y-%m-%d') DESC"
-        # 执行sql
-        db.cursor_d.execute(sql)
-        res = db.cursor_d.fetchall()
-        for re in res:
-            re['publish_type'] = 'published'
-            re.pop('id')
-            # 剔除key = id的字段
-            result.append(re)
+        try:
+            db = DButils()
+            db_name = config.DB_NAME.get('video_record')
+            sql = f"SELECT * FROM {db_name}  WHERE DATEDIFF(CURDATE(), STR_TO_DATE(send_time, '%Y-%m-%d')) <= {gap_day} "
+            if account_name and account_name != 'all':
+                account_id = config.account.get(account_name).get('account_id')
+                sql += f"AND account_id = {account_id}"
+            # 按照时间降序排列
+            sql += " ORDER BY STR_TO_DATE(send_time, '%Y-%m-%d') DESC"
+            # 执行sql
+            db.cursor_d.execute(sql)
+            res = db.cursor_d.fetchall()
+            for re in res:
+                re['publish_type'] = 'published'
+                re.pop('id')
+                # 剔除key = id的字段
+                result.append(re)
+        except Exception as e:
+            logger.assemble_logger.error(f'get task list error:{e}')
+        finally:
+            db.close()
 
     if publish_type == 'unpublished' or publish_type is None:
         # 从redis中取出最近days天的任务, FROM REDIS
@@ -124,6 +131,7 @@ def check_dumplicate(book_id, account_name, gap_day=30):
     logger.assemble_logger.info(f'check duplicate book_id:{book_id},account_name:{account_name}')
     account_id = config.account.get(account_name).get('account_id')
     sql = f'select * from video_record where book_id = {str(book_id)} and account_id = {str(account_id)}  and DATEDIFF(CURDATE(), STR_TO_DATE(send_time, \'%Y-%m-%d\')) <= {str(gap_day)}'
+    db = DButils()
     db.cursor_d.execute(sql)
     res = db.cursor_d.fetchall()
     if len(res) > 0:

@@ -68,6 +68,7 @@
         <div class="form-group">
             <label for="account_name">Choose Account:</label>
             <select id="account_name" name="account_name" required>
+                <option value="all">Select Account</option>
                 {% for key, value in account_options.items() %}
                     <option value="{{ key }}">{{ key }}</option>
                 {% end %}

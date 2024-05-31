@@ -37,11 +37,17 @@ class DButils():
         sql_database = 'use douyin;'
         self.cursor.execute(sql_database)
 
+    def close(self):
+        self.cursor_d.close()
+        self.cursor.close()
+        self.db.close()
+
     def refresh(self):
         logger.assemble_logger.info('refresh database connection')
         try:
-            sql_database = f'use douyin;'
+            sql_database = f'select * from {config.DB_NAME.get("video_record")} limit 1;'
             self.cursor.execute(sql_database)
+            self.cursor_d.execute(sql_database)
             print('database connection is ok')
         except Exception as e:
             self.db = pymysql.connect(**DB_CONFIG)
@@ -53,4 +59,4 @@ class DButils():
 
 
 
-db: DButils = DButils()
+# db: DButils = DButils()
