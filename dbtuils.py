@@ -29,7 +29,7 @@ def singleton(cls, *args, **kwargs):
 class DButils():
 
     def __init__(self):
-        self.db = pymysql.connect(**DB_CONFIG)
+        self.db = pymysql.connect(**NAS_DB_CONFIG)
         self.cursor = self.db.cursor()
         self.cursor_d = self.db.cursor(cursor=pymysql.cursors.DictCursor)
         sql_database = 'use douyin;'
@@ -49,7 +49,7 @@ class DButils():
             self.cursor_d.execute(sql_database)
             print('database connection is ok')
         except Exception as e:
-            self.db = pymysql.connect(**DB_CONFIG)
+            self.db = pymysql.connect(**NAS_DB_CONFIG)
             self.cursor = self.db.cursor()
             self.cursor_d = self.db.cursor(cursor=pymysql.cursors.DictCursor)
             print('reboot database connection')

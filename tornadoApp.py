@@ -62,6 +62,11 @@ class MainHandler(tornado.web.RequestHandler):
         self.render("index.html", account_options=config.account, bgm_options=bgms)
 
 
+class TaskDocHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("tasks_from_doc.html")
+
+
 class TaskListHandler(tornado.web.RequestHandler):
     def get(self):
         account_name = self.get_argument('account_name',None)
@@ -140,65 +145,24 @@ class FormHandler(tornado.web.RequestHandler):
 
 
 
-class DocHandler(tornado.web.RequestHandler):
-    executor = ThreadPoolExecutor(max_workers=20)
+class DocToListHandler(tornado.web.RequestHandler):
 
     @tornado.gen.coroutine
     def post(self):
         try:
-            doc_url = self.get_argument('doc_url')
+            doc_url = self.get_argument('url')
             tasklist = get_docs(doc_url)
-            for task in tasklist:
-                try:
-                    book_id = task('book_id')
-                    bgm_name = task('bgm_name')
-                    account_name = task('account')
-                    publish_time = task('publish_time').replace('/', '-')
-                    is_summary = task('is_summary')
-                    if datetime.strptime(publish_time, "%d/%m/%Y %H:%M") < datetime.now():
-                        publish_time = '0'
-                    if is_summary == '1':
-                        is_summary = True
-                    elif is_summary == '0':
-                        is_summary = False
-                    client_id = self.get_argument('clientId')
-
-                    logger.inject_web_handler(WebSocketHandler,client_id,ws_logger)
-                    logger.assemble_logger.info(
-                        f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
-                    # 封装task dict
-                    taskid = str(config.account.get(account_name))+ str(book_id)
-                    task = {
-                        'taskid':taskid,
-                        'account_name': account_name,
-                        'book_id': book_id,
-                        'publish_time': publish_time
-                    }
-
-                    # 把task添加到列表里，并返回index
-                    task_idx = tasks.push(task)
-                    logger.assemble_logger.info(f'Task added to queue, index: {task_idx}')
-                    result = video_output(account_name, book_id, publish_time, bgm_name, False, True, is_summary)
-                    if not result:
-                        logger.assemble_logger.info(f'Task ended cause of duplicate')
-                    message_dict = {'taskid': taskid, 'message': f'任务已完成'}
-                    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
-                    logger.assemble_logger.info(f'Task successfully completed')
-                except Exception as e:
-                    logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
-                    self.write("Task Ended with Error")
-                finally:
-                    tasks.pop(task_idx)
-                    logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
-                    message_dict = {'taskid': taskid, 'message': f'任务失败'}
-                    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
         except Exception as e:
             logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
-            self.write("All Task Ended with Error")
+            tasklist = []
         finally:
-            logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
-            logger.revmove_web_handler(client_id,ws_logger)
-            self.finish()
+            result = json.dumps(tasklist,ensure_ascii=False)
+            # 设置响应头的 Content-Type 为 application/json
+            self.set_header("Content-Type", "application/json")
+            print(result)
+            self.write(result)
+
+
 
 
 def make_app():
@@ -207,7 +171,8 @@ def make_app():
         (r"/form", FormHandler),
         (r"/ws", WebSocketHandler),
         (r"/list", TaskListHandler),
-        (r"/task_from_doc", DocHandler),
+        (r"/form_by_doc", DocToListHandler),
+        (r"/tasks_from_doc", TaskDocHandler),
     ], template_path=os.path.join(os.path.dirname(__file__), "html"))
 
 
