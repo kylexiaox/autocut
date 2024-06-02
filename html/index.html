@@ -93,6 +93,11 @@
                 <option value="{{ key }}">{{ key }}</option>
             {% end %}
         </select>
+        <label for="is_summary">是否将前面内容作为摘要:</label>
+              <select id="is_summary" name="is_summary" required>
+                    <option value="0">不是</option>
+                    <option value="1" selected>是</option>
+        </select>
         <button type="submit">Submit</button>
     </form>
     <p id="resultMessage"></p>

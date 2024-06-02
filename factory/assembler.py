@@ -64,7 +64,7 @@ def log_progress(stop_event):
 
 def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, voice_type='female',
               video_type='西餐美食小吃视频', platform='fanqie',
-              bitrate='5000k', cover_img='girl1_large', is_test=False):
+              bitrate='5000k', cover_img='girl1_large',is_summary=True, is_test=False):
     """
     视频混剪函数，
     :param bookid:
@@ -82,10 +82,15 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     :return:
     """
     # 获取内容音频
+    taskid = str(account) + str(bookid)
     fq_crawler = fanqie_crawler()
+    message_dict = { 'taskid': taskid, 'message': f'开始获取内容和音频...' }
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     audio_clip, srt_path, book_name = get_text_voice(fq_crawler, bookid, content_type=content_type,
-                                                     voice_type=voice_type, use_cache=True, is_test=is_test)
+                                                     voice_type=voice_type, use_cache=True,is_summary=is_summary, is_test=is_test)
     # 音量标准化
+    message_dict = {'taskid': taskid, 'message': f'处理音频+BGM...'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     audio_clip = audio_clip.audio_normalize()
     video_len = audio_clip.duration
     logger.assemble_logger.info(f'处理BGM,BGM使用的是{bgm_name}')
@@ -105,15 +110,23 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     overlay_audio_clip = CompositeAudioClip([audio_clip, bgm_clip])
     overlay_audio_clip.fps = 44100
     logger.assemble_logger.info(f'合并解压视频素材')
+    message_dict = {'taskid': taskid, 'message': f'合并素材...'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     video_clip, filelog = combineVideo(tim_len=overlay_audio_clip.duration, frag_dur=None, speed=1,
                                        video_type=video_type,
                                        write=False)
     logger.assemble_logger.info(f'音视频合并')
+    message_dict = {'taskid': taskid, 'message': f'音视频合并...'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     video_clip = video_clip.set_audio(overlay_audio_clip)
     # 创建字幕文本剪辑
     logger.assemble_logger.info('处理字幕')
+    message_dict = {'taskid': taskid, 'message': f'处理字幕...'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     video_clip = add_srt_to_video(srt_file=srt_path, video_clip=video_clip, video_type=video_type)
     logger.assemble_logger.info('处理标题别名')
+    message_dict = {'taskid': taskid, 'message': f'处理标题别名...'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     # label_text = config.label_str.get('fanqie') + '\n《' + alias + '》'
     label_text = config.label_str.get(platform) + alias
     final_clip = add_label_to_video(text=label_text, pic_file=config.icon_file.get(platform), video_clip=video_clip,
@@ -126,6 +139,8 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     output_path = os.path.join(output_folder, str(bookid) + '_' + bgm_name + '.mp4')
     # 确保输出文件夹路径存在，如果不存在则创建
     logger.assemble_logger.info('处理简介摘要')
+    message_dict = {'taskid': taskid, 'message': f'处理简介摘要...'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     with open(output_folder + '/' + book_name + '_original_text.txt', 'r') as file:
         # 读取文件内容
         description = file.read()
@@ -142,6 +157,8 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     stop_event = threading.Event()
     threading.Thread(target=log_progress, args=(stop_event,)).start()
     try:
+        message_dict = {'taskid': taskid, 'message': f'输出视频...'}
+        logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
         final_clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate, fps=fps,
                                preset='slow')
     except Exception as e:
@@ -162,7 +179,7 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     return result
 
 
-def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cache=True, is_test=False):
+def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cache=True, is_summary=True, is_test=False):
     """
     通过bookid拿音频+字幕
     :param bookid:
@@ -187,7 +204,7 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
             return audio_clip, srt_path, bookinfo[0]
         logger.assemble_logger.info(f"获取音频文件：{bookid}")
         bookinfo = crawler.get_book_info(bookid)
-        origin_summary,origin_content = crawler.get_content_from_fanqie_dp(bookid)
+        origin_summary,origin_content = crawler.get_content_from_fanqie_dp(bookid,is_summary)
         logger.assemble_logger.info(f"origin_summary:{origin_summary}")
         logger.assemble_logger.info(f"origin_content:{origin_content[:100]}")
         if origin_summary != '':
@@ -447,9 +464,16 @@ def push_to_mq_test(msg):
     logger.assemble_logger.info(f"测试发送数据id：{message_id},消息： {msg}")
 
 
-def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False,is_push=True):
+def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False,is_push=True,is_summary= True):
+    # 封装 消息字符串
+    account = config.account.get(account_name).get('account_id')
+    taskid = str(account) + str(bookid)
+    message_dict = { 'taskid': taskid, 'message': f'任务开始处理'}
+    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     if dao.check_dumplicate(book_id=bookid, account_name=account_name):
         logger.assemble_logger.info(f'video task is duplicate return False')
+        message_dict = {'taskid': taskid, 'message': f'任务重复，结束处理'}
+        logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
         return False
     logger.assemble_logger.info(f'开始处理任务：书籍id是：{bookid},发布时间：{publish_time},BGM：{bgm_name},发布到账户：{account_name}上....')
     if bgm_name is None:
@@ -459,12 +483,12 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
         bgm_name = random.choice(bgms)
     crawler = fanqie_crawler()
     alias_name, alias_id = crawler.get_alias_id(book_id=bookid)
-    account = config.account.get(account_name).get('account_id')
+
     voice_type = config.account.get(account_name).get('voice_type')
     cover_img = config.account.get(account_name).get('cover_img')
     video_type = config.account.get(account_name).get('video_type')
     result = assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account=account, video_type=video_type,
-                      cover_img=cover_img, publish_time=publish_time, alias=alias_name, is_test=is_test)
+                      cover_img=cover_img, publish_time=publish_time, alias=alias_name,is_summary = is_summary, is_test=is_test)
     # result = {'book_id': '7366551041162103833', 'alias': '打脸男闺蜜', 'book_name': '感化不了的妻子，我不要了', 'account': 30365867345, 'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-26/7366551041162103833_感化不了的妻子，我不要了', 'title': '🍅小说sou:《打脸男闺蜜》', 'description': '杀青庆功宴上，老婆把赞助商送的男款情侣表送给了前男友。二人拿着情侣表拍了张接吻照。大伙儿看了我一眼错愕的问她：“沈老师，你亲错人了吧？”“戏都拍完了，这是什么情况', 'publish_time': '0', 'content_type': 'short_novel'}
     if is_push:
         push_to_message_queue(book_name=result.get('book_name'), book_id=result.get('book_id'),

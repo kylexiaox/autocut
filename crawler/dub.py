@@ -154,7 +154,7 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
             else:
                 counter += 1
                 logger.assemble_logger.info(f'字幕返回失败，重试，第{counter}次')
-                time.sleep(2)
+                time.sleep(3)
                 continue
     return audio_path,srt_path
 

@@ -7,7 +7,6 @@ coding:utf-8
 @Description:
 '''
 
-
 import pymysql
 
 import logger
@@ -27,7 +26,6 @@ def singleton(cls, *args, **kwargs):
     return _singleton
 
 
-@singleton
 class DButils():
 
     def __init__(self):
@@ -38,9 +36,10 @@ class DButils():
         self.cursor.execute(sql_database)
 
     def close(self):
-        self.cursor_d.close()
-        self.cursor.close()
-        self.db.close()
+        if self.db.open:
+            self.cursor_d.close()
+            self.cursor.close()
+            self.db.close()
 
     def refresh(self):
         logger.assemble_logger.info('refresh database connection')
@@ -54,9 +53,5 @@ class DButils():
             self.cursor = self.db.cursor()
             self.cursor_d = self.db.cursor(cursor=pymysql.cursors.DictCursor)
             print('reboot database connection')
-
-
-
-
 
 # db: DButils = DButils()

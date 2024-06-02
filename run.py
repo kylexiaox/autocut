@@ -17,9 +17,8 @@ from factory import assembler
 
 def get_unturnover_video():
     # 从数据库中获取未归档的视频
+    db = DButils()
     try:
-        db = DButils()
-        logger.putback_logger.info('db connection is refreshed')
         crawler = fanqie_crawler()
         db_name = config.DB_NAME.get('video_record')
         sql = f'select * from {db_name} where is_turnback = 0'
@@ -49,7 +48,7 @@ def get_unturnover_video():
                 logger.putback_logger.info('successfully putback video link : %s to the bookid %s in fanqie' % (video_id,book_id))
     except Exception as e:
         logger.putback_logger.error('error in get_unturnover_video')
-        logger.putback_logger.error(e)
+        logger.putback_logger.error(e,exc_info=True)
     finally:
         db.close()
         logger.putback_logger.info('db connection is closed')
@@ -57,7 +56,7 @@ def get_unturnover_video():
 
 
 def schedual_task():
-    logger.putback_logger.info("Hourly task executed!")
+    logger.putback_logger.info("scheduled task executed!")
     # 每五分钟执行一次
     schedule.every(5).minutes.do(get_unturnover_video)
 

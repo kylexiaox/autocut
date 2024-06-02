@@ -78,15 +78,15 @@ def web_handler(formats,handler,clientid):
     web_handler.emit = custom_emit
     return web_handler
 
-def inject_web_handler(hanler,clientid):
+def inject_web_handler(hanler,clientid,logger):
     wh = web_handler(config.formatter,hanler,clientid)
-    assemble_logger.addHandler(wh)
+    logger.addHandler(wh)
     wh.close()
 
-def revmove_web_handler(clientid):
+def revmove_web_handler(clientid,logger):
     for h in assemble_logger.handlers:
         if h.name == clientid:
-            assemble_logger.removeHandler(h)
+            logger.removeHandler(h)
             h.close()
 
 
@@ -100,4 +100,5 @@ def create_log_dir(log_dir):
 
 assemble_logger = get_logger('assemble')
 putback_logger = get_logger('putback')
+ws_logger = get_logger('ws')
 

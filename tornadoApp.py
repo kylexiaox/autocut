@@ -20,6 +20,8 @@ import os
 import sys
 import logger
 import asyncio
+
+from crawler.qqdoc import get_docs
 from dbtuils import *
 import io
 import time
@@ -57,7 +59,7 @@ class MainHandler(tornado.web.RequestHandler):
     def get(self):
         bgms = [name for name in os.listdir(config.bgm_directory) if
                 os.path.isdir(os.path.join(config.bgm_directory, name))]
-        self.render("index_tornado.html", account_options=config.account, bgm_options=bgms)
+        self.render("index.html", account_options=config.account, bgm_options=bgms)
 
 
 class TaskListHandler(tornado.web.RequestHandler):
@@ -85,18 +87,23 @@ class FormHandler(tornado.web.RequestHandler):
             bgm_name = self.get_argument('bgm_name')
             account_name = self.get_argument('account')
             publish_time = self.get_argument('publish_time')
+            is_summary = self.get_argument('is_summary', '1')
             if publish_time != '0':
                 publish_time = publish_time.replace('T', ' ')
+            if is_summary == '1':
+                is_summary = True
+            elif is_summary == '0':
+                is_summary = False
             client_id = self.get_argument('clientId')
 
-            if publish_time != '0':
-                publish_time = publish_time.replace('T', ' ')
-            logger.inject_web_handler(WebSocketHandler,client_id)
+            logger.inject_web_handler(WebSocketHandler,client_id,assemble_logger)
             WebSocketHandler.send_message(client_id,f"this is main thread {time.time()}")
             logger.assemble_logger.info(
                 f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
             # 封装task dict
+            taskid = str(config.account.get(account_name)) + str(book_id)
             task = {
+                'taskid': taskid,
                 'account_name': account_name,
                 'book_id': book_id,
                 'publish_time': publish_time
@@ -112,7 +119,8 @@ class FormHandler(tornado.web.RequestHandler):
                 publish_time,
                 bgm_name,
                 False,  # 是否测试
-                True  # 是否需要推送到MQ
+                True,  # 是否需要推送到MQ
+                is_summary # 是否摘要到单独处理
             )
 
             result = yield future  # 等待任务完成
@@ -127,10 +135,70 @@ class FormHandler(tornado.web.RequestHandler):
         finally:
             tasks.pop(task_idx)
             logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
-            logger.revmove_web_handler(client_id)
+            logger.revmove_web_handler(client_id,assemble_logger)
             self.finish()
 
 
+
+class DocHandler(tornado.web.RequestHandler):
+    executor = ThreadPoolExecutor(max_workers=20)
+
+    @tornado.gen.coroutine
+    def post(self):
+        try:
+            doc_url = self.get_argument('doc_url')
+            tasklist = get_docs(doc_url)
+            for task in tasklist:
+                try:
+                    book_id = task('book_id')
+                    bgm_name = task('bgm_name')
+                    account_name = task('account')
+                    publish_time = task('publish_time').replace('/', '-')
+                    is_summary = task('is_summary')
+                    if datetime.strptime(publish_time, "%d/%m/%Y %H:%M") < datetime.now():
+                        publish_time = '0'
+                    if is_summary == '1':
+                        is_summary = True
+                    elif is_summary == '0':
+                        is_summary = False
+                    client_id = self.get_argument('clientId')
+
+                    logger.inject_web_handler(WebSocketHandler,client_id,ws_logger)
+                    logger.assemble_logger.info(
+                        f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
+                    # 封装task dict
+                    taskid = str(config.account.get(account_name))+ str(book_id)
+                    task = {
+                        'taskid':taskid,
+                        'account_name': account_name,
+                        'book_id': book_id,
+                        'publish_time': publish_time
+                    }
+
+                    # 把task添加到列表里，并返回index
+                    task_idx = tasks.push(task)
+                    logger.assemble_logger.info(f'Task added to queue, index: {task_idx}')
+                    result = video_output(account_name, book_id, publish_time, bgm_name, False, True, is_summary)
+                    if not result:
+                        logger.assemble_logger.info(f'Task ended cause of duplicate')
+                    message_dict = {'taskid': taskid, 'message': f'任务已完成'}
+                    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+                    logger.assemble_logger.info(f'Task successfully completed')
+                except Exception as e:
+                    logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
+                    self.write("Task Ended with Error")
+                finally:
+                    tasks.pop(task_idx)
+                    logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
+                    message_dict = {'taskid': taskid, 'message': f'任务失败'}
+                    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+        except Exception as e:
+            logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
+            self.write("All Task Ended with Error")
+        finally:
+            logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
+            logger.revmove_web_handler(client_id,ws_logger)
+            self.finish()
 
 
 def make_app():
@@ -139,6 +207,7 @@ def make_app():
         (r"/form", FormHandler),
         (r"/ws", WebSocketHandler),
         (r"/list", TaskListHandler),
+        (r"/task_from_doc", DocHandler),
     ], template_path=os.path.join(os.path.dirname(__file__), "html"))
 
 

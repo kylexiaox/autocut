@@ -104,7 +104,7 @@ class fanqie_crawler(crawler.crawler):
         return item_ids
 
     @retry()
-    def get_content_from_fanqie_dp(self,book_id):
+    def get_content_from_fanqie_dp(self,book_id,is_summary = True):
         """
         拿短篇内容
         :param book_id:
@@ -119,7 +119,7 @@ class fanqie_crawler(crawler.crawler):
         text_content = json_response['data']['content']
         # 使用 BeautifulSoup 剔除标签
         soup = BeautifulSoup(text_content, 'html.parser')
-        summary,content = clean_the_soup_short(soup)
+        summary,content = clean_the_soup_short(soup,is_summary)
         if summary:
             summary = summary.get_text()
         content = content.get_text()
@@ -233,13 +233,14 @@ class fanqie_crawler(crawler.crawler):
             logger.putback_logger.info(response.text)
 
 
-def clean_the_soup_short(soup):
+def clean_the_soup_short(soup,is_summary=True):
     """
     为番茄短篇清洗soup内容,剔除章节标题
     剔除单行的1、2、3.
     剔除单行的第一章、第二章、第三章等
     并把文本分割，区分为第一章节标题前的内容作为摘要，后面的作为正文内容
     :param soup:
+    :param has_summary: 是否有摘要,摘要是否要分割出来 True 为拆，False 为不拆
     :return:
     """
     logger.assemble_logger.info(f"开始处理文本文件，剔除章节标题,并拆解摘要和正文内容...")
@@ -248,8 +249,6 @@ def clean_the_soup_short(soup):
     # 创建两个新的BeautifulSoup对象，一个用于存放摘要内容，一个用于存放正文内容
     summary = BeautifulSoup('', 'html.parser')
     content = BeautifulSoup('', 'html.parser')
-    # 用于判断是否为摘要内容
-    is_summary = True
     # 剔除匹配到的<p>标签
     for idex, p_tag in enumerate(soup.find_all('p')):
         if pattern.match(p_tag.text.strip()):
