@@ -150,12 +150,16 @@ def check_dumplicate(book_id, account_name, gap_day=30):
             logger.assemble_logger.info(
                 f'book_id:{str(book_id)},account_name:{account_name} is duplicate cause has duplicate task in redis')
             return True
+    tasks_obj = tasks.get_all()
+    for task in tasks_obj:
+        if task['book_id'] == book_id and task['account_name'] == account_name:
+            logger.assemble_logger.info(
+                f'book_id:{str(book_id)},account_name:{account_name} is duplicate cause has duplicate task in task queue')
+            return True
     logger.assemble_logger.info(f'book_id:{str(book_id)},account_name:{account_name} is not duplicate')
     return False
 
-    #
-    # sql = f'select * from {db_name} where datediff(now(),created_at) < %s'
-    # return query(sql, (days,))
+
 
 
 if __name__ == '__main__':

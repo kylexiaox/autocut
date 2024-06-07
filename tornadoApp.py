@@ -105,17 +105,7 @@ class FormHandler(tornado.web.RequestHandler):
             WebSocketHandler.send_message(client_id,f"this is main thread {time.time()}")
             logger.assemble_logger.info(
                 f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
-            # 封装task dict
-            taskid = str(config.account.get(account_name)) + str(book_id)
-            task = {
-                'taskid': taskid,
-                'account_name': account_name,
-                'book_id': book_id,
-                'publish_time': publish_time
-            }
-            # 把task添加到列表里，并返回index
-            task_idx = tasks.push(task)
-            logger.assemble_logger.info(f'Task added to queue, index: {task_idx}')
+
             future = tornado.ioloop.IOLoop.current().run_in_executor(
                 self.executor,
                 video_output,
@@ -138,8 +128,6 @@ class FormHandler(tornado.web.RequestHandler):
             logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
             self.write("Task Ended with Error")
         finally:
-            tasks.pop(task_idx)
-            logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
             logger.revmove_web_handler(client_id,assemble_logger)
             self.finish()
 

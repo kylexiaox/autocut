@@ -40,6 +40,9 @@ class DButils():
             self.cursor_d.close()
             self.cursor.close()
             self.db.close()
+            print('database connection is closed')
+        else:
+            print('database connection is already closed')
 
     def refresh(self):
         logger.assemble_logger.info('refresh database connection')

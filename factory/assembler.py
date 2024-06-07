@@ -467,8 +467,10 @@ def push_to_mq_test(msg):
 def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False,is_push=True,is_summary= True):
     # 封装 消息字符串
     account = config.account.get(account_name).get('account_id')
+    # 封装task dict
+
     taskid = str(account) + str(bookid)
-    message_dict = { 'taskid': taskid, 'message': f'任务开始处理'}
+    message_dict = {'taskid': taskid, 'message': f'任务开始处理'}
     logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
     if dao.check_dumplicate(book_id=bookid, account_name=account_name):
         logger.assemble_logger.info(f'video task is duplicate return False')
@@ -476,30 +478,48 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
         logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
         return False
     logger.assemble_logger.info(f'开始处理任务：书籍id是：{bookid},发布时间：{publish_time},BGM：{bgm_name},发布到账户：{account_name}上....')
-    if bgm_name is None:
-        # 随机分配音乐
-        bgm_dir = '/Volumes/公共空间/小说推文/BGM素材/'
-        bgms = [f.name for f in os.scandir(bgm_dir) if f.is_dir()]
-        bgm_name = random.choice(bgms)
-    crawler = fanqie_crawler()
-    alias_name, alias_id = crawler.get_alias_id(book_id=bookid)
+    task = {
+        'taskid': taskid,
+        'account_name': account_name,
+        'book_id': bookid,
+        'publish_time': publish_time
+    }
+    # 把task添加到列表里，并返回index
+    task_idx = dao.tasks.push(task)
+    logger.assemble_logger.info(f'Task added to queue, index: {task_idx}')
+    try:
+        if bgm_name is None:
+            # 随机分配音乐
+            bgm_dir = '/Volumes/公共空间/小说推文/BGM素材/'
+            bgms = [f.name for f in os.scandir(bgm_dir) if f.is_dir()]
+            bgm_name = random.choice(bgms)
+        crawler = fanqie_crawler()
+        alias_name, alias_id = crawler.get_alias_id(book_id=bookid)
 
-    voice_type = config.account.get(account_name).get('voice_type')
-    cover_img = config.account.get(account_name).get('cover_img')
-    video_type = config.account.get(account_name).get('video_type')
-    result = assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account=account, video_type=video_type,
-                      cover_img=cover_img, publish_time=publish_time, alias=alias_name,is_summary = is_summary, is_test=is_test)
-    # result = {'book_id': '7366551041162103833', 'alias': '打脸男闺蜜', 'book_name': '感化不了的妻子，我不要了', 'account': 30365867345, 'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-26/7366551041162103833_感化不了的妻子，我不要了', 'title': '🍅小说sou:《打脸男闺蜜》', 'description': '杀青庆功宴上，老婆把赞助商送的男款情侣表送给了前男友。二人拿着情侣表拍了张接吻照。大伙儿看了我一眼错愕的问她：“沈老师，你亲错人了吧？”“戏都拍完了，这是什么情况', 'publish_time': '0', 'content_type': 'short_novel'}
-    if is_push:
-        push_to_message_queue(book_name=result.get('book_name'), book_id=result.get('book_id'),
-                              content_type=result.get('content_type'), alias=result.get('alias'),
-                              account=result.get('account'), filepath=result.get('filepath'), title=result.get('title'),
-                              description=result.get('description'), publish_time=result.get('publish_time'),
-                              img_path=result.get('img_path'),)
-        return result
-    else:
-        logger.assemble_logger.info(f'测试环境，不推送到消息队列')
-        return result
+        voice_type = config.account.get(account_name).get('voice_type')
+        cover_img = config.account.get(account_name).get('cover_img')
+        video_type = config.account.get(account_name).get('video_type')
+        result = assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account=account, video_type=video_type,
+                          cover_img=cover_img, publish_time=publish_time, alias=alias_name,is_summary = is_summary, is_test=is_test)
+        # result = {'book_id': '7366551041162103833', 'alias': '打脸男闺蜜', 'book_name': '感化不了的妻子，我不要了', 'account': 30365867345, 'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-26/7366551041162103833_感化不了的妻子，我不要了', 'title': '🍅小说sou:《打脸男闺蜜》', 'description': '杀青庆功宴上，老婆把赞助商送的男款情侣表送给了前男友。二人拿着情侣表拍了张接吻照。大伙儿看了我一眼错愕的问她：“沈老师，你亲错人了吧？”“戏都拍完了，这是什么情况', 'publish_time': '0', 'content_type': 'short_novel'}
+        if is_push:
+            push_to_message_queue(book_name=result.get('book_name'), book_id=result.get('book_id'),
+                                  content_type=result.get('content_type'), alias=result.get('alias'),
+                                  account=result.get('account'), filepath=result.get('filepath'), title=result.get('title'),
+                                  description=result.get('description'), publish_time=result.get('publish_time'),
+                                  img_path=result.get('img_path'),)
+            return result
+        else:
+            logger.assemble_logger.info(f'测试环境，不推送到消息队列')
+            return result
+    except Exception as e:
+        logger.assemble_logger.error(f'视频处理失败，错误信息：{e}', exc_info=True)
+        message_dict = {'taskid': taskid, 'message': f'任务处理失败，错误信息：{e}'}
+        logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+        raise e
+    finally:
+        dao.tasks.pop(task_idx)
+        logger.assemble_logger.info(f'Task removed from queue, index: {task_idx}')
 
 
 
