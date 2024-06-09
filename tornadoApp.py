@@ -7,7 +7,6 @@ coding:utf-8
 @Description:
 '''
 
-
 import tornado.ioloop
 from tornado import gen
 from tornado.ioloop import PeriodicCallback
@@ -28,6 +27,7 @@ import time
 
 # 添加项目根目录到 Python 路径
 from factory.dao import *
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'autocut')))
 from factory.assembler import *
 from logger import *
@@ -69,8 +69,8 @@ class TaskDocHandler(tornado.web.RequestHandler):
 
 class TaskListHandler(tornado.web.RequestHandler):
     def get(self):
-        account_name = self.get_argument('account_name',None)
-        gap_day = self.get_argument('gap_day',3)
+        account_name = self.get_argument('account_name', None)
+        gap_day = self.get_argument('gap_day', 3)
         logger.assemble_logger.info(f'account_name:{account_name},gap_day:{gap_day}')
         if account_name is None:
             task_list = []
@@ -78,8 +78,8 @@ class TaskListHandler(tornado.web.RequestHandler):
             # 获取任务列表
             task_list = get_task_list(gap_day, account_name)
         logger.assemble_logger.info(f'get :{len(task_list)} items')
-        self.render("task_list.html", task_list=task_list,account_name=account_name,gap_day=gap_day,account_options=config.account)
-
+        self.render("task_list.html", task_list=task_list, account_name=account_name, gap_day=gap_day,
+                    account_options=config.account)
 
 
 class TaskHandler(tornado.web.RequestHandler):
@@ -101,8 +101,8 @@ class TaskHandler(tornado.web.RequestHandler):
                 is_summary = False
             client_id = self.get_argument('clientId')
 
-            logger.inject_web_handler(WebSocketHandler,client_id,ws_logger)
-            WebSocketHandler.send_message(client_id,f"this is main thread {time.time()}")
+            logger.inject_web_handler(WebSocketHandler, client_id, ws_logger)
+            WebSocketHandler.send_message(client_id, f"this is main thread {time.time()}")
             logger.assemble_logger.info(
                 f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
 
@@ -115,7 +115,7 @@ class TaskHandler(tornado.web.RequestHandler):
                 bgm_name,
                 False,  # 是否测试
                 True,  # 是否需要推送到MQ
-                is_summary # 是否摘要到单独处理
+                is_summary  # 是否摘要到单独处理
             )
 
             result = yield future  # 等待任务完成
@@ -125,12 +125,11 @@ class TaskHandler(tornado.web.RequestHandler):
             logger.assemble_logger.info(f'Task successfully completed')
             self.write("Task successfully completed")
         except Exception as e:
-            logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
+            logger.assemble_logger.error(f'Error occurred: {e}', exc_info=True)
             self.write("Task Ended with Error")
         finally:
-            logger.revmove_web_handler(client_id,assemble_logger)
+            logger.revmove_web_handler(client_id, assemble_logger)
             self.finish()
-
 
 
 class DocToListHandler(tornado.web.RequestHandler):
@@ -141,14 +140,17 @@ class DocToListHandler(tornado.web.RequestHandler):
             doc_url = self.get_argument('url')
             tasklist = get_docs(doc_url)
         except Exception as e:
-            logger.assemble_logger.error(f'Error occurred: {e}',exc_info=True)
+            logger.assemble_logger.error(f'Error occurred: {e}', exc_info=True)
             tasklist = []
         finally:
-            result = json.dumps(tasklist,ensure_ascii=False)
+            result = json.dumps(tasklist, ensure_ascii=False)
             # 设置响应头的 Content-Type 为 application/json
             self.set_header("Content-Type", "application/json")
             print(result)
+            self.set_status(200)
             self.write(result)
+            self.finish()
+
 
 class ProcessTasksHandler(tornado.web.RequestHandler):
     @tornado.gen.coroutine
@@ -157,17 +159,37 @@ class ProcessTasksHandler(tornado.web.RequestHandler):
             payload = json.loads(self.request.body)
             clientId = payload.get('clientId')
             tasks = payload.get('tasks')
+            logger.inject_web_handler(WebSocketHandler, clientId, ws_logger)
 
             # 处理tasks和clientid
             print(f"Processing tasks for clientid: {clientId}")
             for task in tasks:
                 print(f"Processing task: {task}")
+                account_name = task.get('account_name')
+                book_id = task.get('book_id')
+                bgm_name = task.get('bgm_name')
+                publish_time = task.get('publish_time')
+                is_summary = task.get('is_summary')
+                account_id = config.account.get(account_name).get('account_id')
+                taskid = str(account_id) + str(book_id)
+                message_dict = {'taskid': taskid, 'message': f'开始处理任务'}
+                logger.ws_logger.info(json.dumps(message_dict))
+                try:
+                    video_output(account_name=account_name, book_id=book_id, publish_time=publish_time, bgm_name=bgm_name,
+                                 is_test=False, is_push=True, is_summary=is_summary)
+                    time.sleep(1)
+                except Exception as e:
+                    message_dict = {'taskid': taskid, 'message': f'任务处理失败:{e}'}
+                    logger.ws_logger.error(json.dumps(message_dict))
+                    continue
 
             self.write(json.dumps({"status": "success", "message": "Tasks processed successfully"}))
         except json.JSONDecodeError:
             self.set_status(400)
             self.write(json.dumps({"status": "error", "message": "Invalid JSON"}))
-
+        finally:
+            logger.revmove_web_handler(clientId, assemble_logger)
+            self.finish()
 
 
 def make_app():
@@ -184,7 +206,6 @@ def make_app():
 
 
 if __name__ == "__main__":
-
     # 使用 AnyThreadEventLoopPolicy 确保在多线程中正确使用 asyncio
     asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
     app = make_app()
@@ -195,6 +216,7 @@ if __name__ == "__main__":
     periodic_callback.start()
 
     # 这里是检查标记的示例
-    tornado.ioloop.IOLoop.current().call_later(3600000, lambda: ("Database access completed:", DButils().refresh.completed))
+    tornado.ioloop.IOLoop.current().call_later(3600000,
+                                               lambda: ("Database access completed:", DButils().refresh.completed))
 
     tornado.ioloop.IOLoop.current().start()

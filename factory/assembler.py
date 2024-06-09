@@ -51,7 +51,7 @@ def retry(max_retries=3, delay=1):
     return decorator
 
 
-def log_progress(stop_event):
+def log_progress(stop_event,taskid):
     """
     记录视频处理进度
     :param stop_event:
@@ -59,6 +59,8 @@ def log_progress(stop_event):
     """
     while not stop_event.is_set():
         logger.assemble_logger.info("Video processing in progress...")
+        message_dict = {'taskid': taskid, 'message': f'输出视频...'}
+        logger.ws_logger.info(json.dumps(message_dict))
         stop_event.wait(15)  # 每隔 15 秒记录一次日志
 
 
@@ -85,12 +87,12 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     taskid = str(account) + str(bookid)
     fq_crawler = fanqie_crawler()
     message_dict = { 'taskid': taskid, 'message': f'开始获取内容和音频...' }
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     audio_clip, srt_path, book_name = get_text_voice(fq_crawler, bookid, content_type=content_type,
                                                      voice_type=voice_type, use_cache=True,is_summary=is_summary, is_test=is_test)
     # 音量标准化
     message_dict = {'taskid': taskid, 'message': f'处理音频+BGM...'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     audio_clip = audio_clip.audio_normalize()
     video_len = audio_clip.duration
     logger.assemble_logger.info(f'处理BGM,BGM使用的是{bgm_name}')
@@ -111,22 +113,22 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     overlay_audio_clip.fps = 44100
     logger.assemble_logger.info(f'合并解压视频素材')
     message_dict = {'taskid': taskid, 'message': f'合并素材...'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     video_clip, filelog = combineVideo(tim_len=overlay_audio_clip.duration, frag_dur=None, speed=1,
                                        video_type=video_type,
                                        write=False)
     logger.assemble_logger.info(f'音视频合并')
     message_dict = {'taskid': taskid, 'message': f'音视频合并...'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     video_clip = video_clip.set_audio(overlay_audio_clip)
     # 创建字幕文本剪辑
     logger.assemble_logger.info('处理字幕')
     message_dict = {'taskid': taskid, 'message': f'处理字幕...'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     video_clip = add_srt_to_video(srt_file=srt_path, video_clip=video_clip, video_type=video_type)
     logger.assemble_logger.info('处理标题别名')
     message_dict = {'taskid': taskid, 'message': f'处理标题别名...'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     # label_text = config.label_str.get('fanqie') + '\n《' + alias + '》'
     label_text = config.label_str.get(platform) + alias
     final_clip = add_label_to_video(text=label_text, pic_file=config.icon_file.get(platform), video_clip=video_clip,
@@ -140,7 +142,7 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     # 确保输出文件夹路径存在，如果不存在则创建
     logger.assemble_logger.info('处理简介摘要')
     message_dict = {'taskid': taskid, 'message': f'处理简介摘要...'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     with open(output_folder + '/' + book_name + '_original_text.txt', 'r') as file:
         # 读取文件内容
         description = file.read()
@@ -155,10 +157,10 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     fps = final_clip.fps
     # 导出视频
     stop_event = threading.Event()
-    threading.Thread(target=log_progress, args=(stop_event,)).start()
+    threading.Thread(target=log_progress, args=(stop_event,taskid)).start()
     try:
         message_dict = {'taskid': taskid, 'message': f'输出视频...'}
-        logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+        logger.ws_logger.info(json.dumps(message_dict))
         final_clip.write_videofile(output_path, codec='h264_videotoolbox', bitrate=bitrate, fps=fps,
                                preset='slow')
     except Exception as e:
@@ -475,11 +477,11 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
 
     taskid = str(account) + str(bookid)
     message_dict = {'taskid': taskid, 'message': f'任务开始处理'}
-    logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+    logger.ws_logger.info(json.dumps(message_dict))
     if dao.check_dumplicate(book_id=bookid, account_name=account_name):
         logger.assemble_logger.info(f'video task is duplicate return False')
         message_dict = {'taskid': taskid, 'message': f'任务重复，结束处理'}
-        logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+        logger.ws_logger.info(json.dumps(message_dict))
         return False
     logger.assemble_logger.info(f'开始处理任务：书籍id是：{bookid},发布时间：{publish_time},BGM：{bgm_name},发布到账户：{account_name}上....')
     task = {
@@ -519,7 +521,7 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
     except Exception as e:
         logger.assemble_logger.error(f'视频处理失败，错误信息：{e}', exc_info=True)
         message_dict = {'taskid': taskid, 'message': f'任务处理失败，错误信息：{e}'}
-        logger.ws_logger.info(json.dumps(message_dict).encode('utf-8'))
+        logger.ws_logger.info(json.dumps(message_dict))
         raise e
     finally:
         dao.tasks.pop(task_idx)

@@ -45,6 +45,9 @@
         .hidden {
             display: none;
         }
+        .hidden-column {
+            display: none;
+        }
         table {
             border-collapse: collapse;
             width: 100%;
@@ -86,15 +89,17 @@
             <input type="text" id="urlInput" name="url" required>
         </div>
         <button type="submit">Fetch</button>
-        <button id="processButton">处理</button>
     </form>
+    <button id="processButton">处理</button>
+    <br>
+    <div id="resultDisplay"></div> <!-- 显示结果的区域 -->
     <div class="result hidden" id="resultDiv">
         <h2>Result:</h2>
         <table id="resultTable">
             <thead>
                 <tr>
-                    <!-- 预先添加状态列 -->
-                    <th>taskid</th>
+                    <th class="hidden-column">taskid</th>
+                    <th class="hidden-column">account_id</th>
                     <th>status</th>
                 </tr>
             </thead>
@@ -103,48 +108,52 @@
     </div>
 
     <script>
-
-        // 将 dict 内容 转换成utf8 可读内容
         function decodeUnicode(str) {
-            return str.replace(/\\\\u[\dA-F]{4}/gi,
-                function (match) {
-                    return String.fromCharCode(parseInt(match.replace(/\\\\u/g, ''), 16));
-                });
+            return str.replace(/\\\\u[\dA-F]{4}/gi, function (match) {
+                return String.fromCharCode(parseInt(match.replace(/\\\\u/g, ''), 16));
+            });
         }
 
         let fetchedData = [];
-            // 生成一个唯一的 clientId（可以是 UUID 或其他唯一标识符）
         const clientId = 'client_' + Math.random().toString(36).substr(2, 9);
         let retryCount = 0;
         const maxRetries = 5;
         const socketProtocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
         const socketUrl = `${socketProtocol}//${window.location.host}/ws?clientId=${clientId}`;
-        const socket = new WebSocket(socketUrl);
+        let socket;
 
-        socket.onopen = function() {
-            console.log('Connected with clientId:', clientId);
-        };
+        function connectWebSocket() {
+            socket = new WebSocket(socketUrl);
 
-        socket.onclose = function() {
-            console.log('Disconnected');
-            if (retryCount < maxRetries) {
-                        retryCount++;
-                        console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
-                        setTimeout(connectWebSocket, 1000 * retryCount); // Exponential backoff
-                    } else {
-                        console.error('Max retries reached. Unable to reconnect.');
-                    }
-        };
+            socket.onopen = function() {
+                console.log('Connected with clientId:', clientId);
+                retryCount = 0; // Reset the retry count on successful connection
+            };
 
-        socket.onmessage = function(event) {
-            const data = event.data;
-            console.log('Received message:', data);
+            socket.onclose = function() {
+                console.log('Disconnected');
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
+                    setTimeout(connectWebSocket, 1000 * retryCount); // Exponential backoff
+                } else {
+                    console.error('Max retries reached. Unable to reconnect.');
+                }
+            };
 
-            const logArea = document.getElementById('logArea');
-            const logMessage = document.createElement('p');
-            logMessage.textContent = data;
-            logArea.appendChild(logMessage);
-        };
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Received message:', data);
+                const taskId = data.taskid;
+                const message = data.message;
+                const statusCell = document.querySelector(`#task_${taskId} .status-cell`);
+                if (statusCell) {
+                    statusCell.textContent = message;
+                }
+            };
+        }
+
+        connectWebSocket();
 
         document.getElementById('urlForm').addEventListener('submit', function(event) {
             event.preventDefault();  // Prevent default form submission
@@ -174,25 +183,32 @@
                 // Create table headers
                 Object.keys(data[0]).forEach(key => {
                     const th = document.createElement('th');
+                    if (key === 'taskid' || key === 'account_id') {
+                        th.classList.add('hidden-column');
+                    }
                     th.textContent = key;
                     resultTableHead.appendChild(th);
                 });
 
+                // Add status column header
+                const statusTh = document.createElement('th');
+                statusTh.textContent = 'status';
+                resultTableHead.appendChild(statusTh);
+
                 // Populate table with data
                 data.forEach(item => {
                     const tr = document.createElement('tr');
-                    tr.id = `task_${item.account + item.book_id}`;
-                    Object.values(item).forEach(value => {
+                    tr.id = `task_${item.account_id + item.book_id}`;
+                    Object.entries(item).forEach(([key, value]) => {
                         const td = document.createElement('td');
+                        if (key === 'taskid' || key === 'account_id') {
+                            td.classList.add('hidden-column');
+                        }
                         td.textContent = value;
                         tr.appendChild(td);
                     });
-                     // Add hidden taskid column
-                    const taskidTd = document.createElement('td');
-                    taskidTd.textContent = item.account + item.book_id;
-                    taskidTd.className = 'hidden-column';
-                    tr.insertBefore(taskidTd, tr.firstChild);
-                     // Add status column
+
+                    // Add status column
                     const statusTd = document.createElement('td');
                     statusTd.className = 'status-cell';
                     tr.appendChild(statusTd);
@@ -221,6 +237,9 @@
             })
             .then(response => response.json())
             .then(result => {
+                const resultDisplay = document.getElementById('resultDisplay');
+                resultDisplay.style.display = 'block';
+                resultDisplay.textContent = result.message;
                 alert('Tasks processed successfully!');
                 console.log(result);
             })

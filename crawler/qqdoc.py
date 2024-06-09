@@ -13,6 +13,7 @@ import pandas as pd
 
 
 # 文档的URL
+import config
 
 
 def get_docs(url,type = 'table'):
@@ -53,9 +54,8 @@ def get_docs(url,type = 'table'):
             for re in results:
                 # 调整publish_time的格式，目前的格式是'YYYY/MM/DD HH:MM' 变成'YYYY-MM-DD HH:MM'
                 re['publish_time'] = re['publish_time'].replace('/', '-')
-                # # 调整编码
-                # re['bgm_name'] = re['bgm_name'].decode('utf-8')
-                # re['account'] = re['account'].decode('utf-8')
+                account_name = re['account_name']
+                re['account_id'] = config.account.get(account_name).get('account_id')
 
             return results
         else:

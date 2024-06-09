@@ -51,8 +51,7 @@ def get_unturnover_video():
         logger.putback_logger.error('error in get_unturnover_video')
         logger.putback_logger.error(e,exc_info=True)
     finally:
-        if db.open:
-            db.close()
+        db.close()
         logger.putback_logger.info('db connection is closed')
 
 
