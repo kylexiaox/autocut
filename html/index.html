@@ -68,6 +68,13 @@
         }
     </style>
 </head>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/list">Task List</a></li>
+            <li><a href="/tasks_from_doc">Process From Doc</a></li>
+        </ul>
+    </nav>
 <body>
 <div class="container">
     <h1>视频生成工具</h1>
@@ -106,6 +113,15 @@
 </div>
 
 <script>
+
+    // 将 dict 内容 转换成utf8 可读内容
+    function decodeUnicode(str) {
+        return str.replace(/\\\\u[\dA-F]{4}/gi,
+            function (match) {
+                return String.fromCharCode(parseInt(match.replace(/\\\\u/g, ''), 16));
+            });
+    }
+
     function togglePublishTime() {
         const publishTimeDiv = document.getElementById('publishTimeDiv');
         const scheduleRadio = document.getElementById('schedulePublish');
@@ -145,9 +161,8 @@
     };
 
     socket.onmessage = function(event) {
-        const data = event.data;
-        console.log('Received message:', data);
-
+        var data = event.data;
+        data = decodeUnicode(data);
         const logArea = document.getElementById('logArea');
         const logMessage = document.createElement('p');
         logMessage.textContent = data;

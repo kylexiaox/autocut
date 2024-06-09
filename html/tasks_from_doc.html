@@ -65,9 +65,20 @@
         tr:hover {
             background-color: #ddd;
         }
+        #processButton {
+            margin-top: 20px;
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/list">Task List</a></li>
+            <li><a href="/tasks_from_doc">Process From Doc</a></li>
+        </ul>
+    </nav>
     <h1>Fetch List from URL</h1>
     <form id="urlForm">
         <div class="form-group">
@@ -75,18 +86,66 @@
             <input type="text" id="urlInput" name="url" required>
         </div>
         <button type="submit">Fetch</button>
+        <button id="processButton">处理</button>
     </form>
     <div class="result hidden" id="resultDiv">
         <h2>Result:</h2>
         <table id="resultTable">
             <thead>
-                <tr></tr>
+                <tr>
+                    <!-- 预先添加状态列 -->
+                    <th>taskid</th>
+                    <th>status</th>
+                </tr>
             </thead>
             <tbody></tbody>
         </table>
     </div>
 
     <script>
+
+        // 将 dict 内容 转换成utf8 可读内容
+        function decodeUnicode(str) {
+            return str.replace(/\\\\u[\dA-F]{4}/gi,
+                function (match) {
+                    return String.fromCharCode(parseInt(match.replace(/\\\\u/g, ''), 16));
+                });
+        }
+
+        let fetchedData = [];
+            // 生成一个唯一的 clientId（可以是 UUID 或其他唯一标识符）
+        const clientId = 'client_' + Math.random().toString(36).substr(2, 9);
+        let retryCount = 0;
+        const maxRetries = 5;
+        const socketProtocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+        const socketUrl = `${socketProtocol}//${window.location.host}/ws?clientId=${clientId}`;
+        const socket = new WebSocket(socketUrl);
+
+        socket.onopen = function() {
+            console.log('Connected with clientId:', clientId);
+        };
+
+        socket.onclose = function() {
+            console.log('Disconnected');
+            if (retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
+                        setTimeout(connectWebSocket, 1000 * retryCount); // Exponential backoff
+                    } else {
+                        console.error('Max retries reached. Unable to reconnect.');
+                    }
+        };
+
+        socket.onmessage = function(event) {
+            const data = event.data;
+            console.log('Received message:', data);
+
+            const logArea = document.getElementById('logArea');
+            const logMessage = document.createElement('p');
+            logMessage.textContent = data;
+            logArea.appendChild(logMessage);
+        };
+
         document.getElementById('urlForm').addEventListener('submit', function(event) {
             event.preventDefault();  // Prevent default form submission
 
@@ -105,6 +164,7 @@
             })
             .then(response => response.json())
             .then(data => {
+                fetchedData = data;
                 const resultDiv = document.getElementById('resultDiv');
                 const resultTableHead = document.querySelector('#resultTable thead tr');
                 const resultTableBody = document.querySelector('#resultTable tbody');
@@ -121,15 +181,48 @@
                 // Populate table with data
                 data.forEach(item => {
                     const tr = document.createElement('tr');
+                    tr.id = `task_${item.account + item.book_id}`;
                     Object.values(item).forEach(value => {
                         const td = document.createElement('td');
                         td.textContent = value;
                         tr.appendChild(td);
                     });
+                     // Add hidden taskid column
+                    const taskidTd = document.createElement('td');
+                    taskidTd.textContent = item.account + item.book_id;
+                    taskidTd.className = 'hidden-column';
+                    tr.insertBefore(taskidTd, tr.firstChild);
+                     // Add status column
+                    const statusTd = document.createElement('td');
+                    statusTd.className = 'status-cell';
+                    tr.appendChild(statusTd);
+
                     resultTableBody.appendChild(tr);
                 });
 
                 resultDiv.classList.remove('hidden');
+                if (data.length > 0) {
+                    document.getElementById('processButton').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+
+        document.getElementById('processButton').addEventListener('click', function() {
+            const payload = { clientId: clientId, tasks: fetchedData };
+            fetch('/process_tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(result => {
+                alert('Tasks processed successfully!');
+                console.log(result);
             })
             .catch(error => {
                 console.error('Error:', error);

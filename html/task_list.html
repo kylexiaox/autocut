@@ -63,6 +63,13 @@
     </style>
 </head>
 <body>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/list">Task List</a></li>
+            <li><a href="/tasks_from_doc">Process From Doc</a></li>
+        </ul>
+    </nav>
     <h1>Fetch Task List</h1>
     <form id="taskForm" action="/list" method="get">
         <div class="form-group">
@@ -93,6 +100,7 @@
                         <th>Video ID</th>
                         <th>Book ID</th>
                         <th>Book Name</th>
+                        <th>Alias</th>
                         <th>Media</th>
                         <th>Content Type</th>
                         <th>Platform</th>
@@ -105,9 +113,10 @@
                             <td>{{ task.get('publish_type') }}</td>
                             <td>{{ task.get('publish_time') }}</td>
                             <td>{{ task.get('account_id') }}</td>
-                            <td>{{ task.get('video_id') }}</td>
+                            <td>{% raw task.get('video_id') %}</td>
                             <td>{{ task.get('book_id') }}</td>
                             <td>{{ task.get('book_name') }}</td>
+                            <td>{{ task.get('alias') }}</td>
                             <td>{{ task.get('media') }}</td>
                             <td>{{ task.get('content_type') }}</td>
                             <td>{{ task.get('platform') }}</td>

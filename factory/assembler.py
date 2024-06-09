@@ -12,7 +12,7 @@ import sys
 import os
 # 将外层目录添加到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+from config import *
 import time
 import threading
 import logger
@@ -436,7 +436,9 @@ def push_to_message_queue(book_name, book_id, content_type, alias, account, file
      'img_path': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后/cover.png', 'platform': 'fanqie',
      'publish_time': '2024-06-01 11:00', 'content_type': 'short_novel'}
     """
-    r = redis.StrictRedis(host='localhost', port=6379, db=0)
+    # 连接到 Redis 服务器
+    r = redis.StrictRedis(host=REDIS_CONFIG.get('host'), port=REDIS_CONFIG.get('port'), db=REDIS_CONFIG.get('db'))
+
     # 生成唯一的uuid
     if img_path is None:
         img_path = filepath + '/' + "cover.png"
@@ -459,7 +461,9 @@ def push_to_message_queue(book_name, book_id, content_type, alias, account, file
 
 
 def push_to_mq_test(msg):
-    r = redis.StrictRedis(host='localhost', port=6379, db=0)
+    # 连接到 Redis 服务器
+    r = redis.StrictRedis(host=REDIS_CONFIG.get('host'), port=REDIS_CONFIG.get('port'), db=REDIS_CONFIG.get('db'))
+
     message_id = r.xadd("task_queue", msg)
     logger.assemble_logger.info(f"测试发送数据id：{message_id},消息： {msg}")
 

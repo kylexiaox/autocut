@@ -9,7 +9,7 @@ coding:utf-8
 from functools import wraps
 
 import redis
-
+from tornado.escape import xhtml_unescape
 from dbtuils import *
 
 
@@ -50,7 +50,8 @@ class TaskQueue():
 tasks = TaskQueue()
 
 # 连接到 Redis 服务器
-r = redis.StrictRedis(host='localhost', port=6379, db=0)
+r = redis.StrictRedis(host=REDIS_CONFIG.get('host'), port=REDIS_CONFIG.get('port'), db=REDIS_CONFIG.get('db'))
+
 
 
 def get_task_list(gap_day=3, account_name=None,publish_type = None):
@@ -71,12 +72,17 @@ def get_task_list(gap_day=3, account_name=None,publish_type = None):
                 account_id = config.account.get(account_name).get('account_id')
                 sql += f"AND account_id = {account_id}"
             # 按照时间降序排列
-            sql += " ORDER BY STR_TO_DATE(send_time, '%Y-%m-%d') DESC"
+            sql += " ORDER BY STR_TO_DATE(publish_time, '%Y-%m-%d') DESC"
             # 执行sql
             db.cursor_d.execute(sql)
             res = db.cursor_d.fetchall()
             for re in res:
                 re['publish_type'] = 'published'
+                url = f"https://www.{re['media']}.com/video/{re['video_id']}"
+                video_id = re['video_id']
+                re['video_id'] = f'<a href="{url}">{video_id}</a>'
+                if re['publish_time'] == '0':
+                    re['publish_time'] = re['send_time']
                 re.pop('id')
                 # 剔除key = id的字段
                 result.append(re)
@@ -88,7 +94,8 @@ def get_task_list(gap_day=3, account_name=None,publish_type = None):
     if publish_type == 'unpublished' or publish_type is None:
         # 从redis中取出最近days天的任务, FROM REDIS
         # 连接到 Redis 服务器
-        r = redis.StrictRedis(host='localhost', port=6379, db=0)
+        r = redis.StrictRedis(host=REDIS_CONFIG.get('host'), port=REDIS_CONFIG.get('port'), db=REDIS_CONFIG.get('db'))
+
         messages = r.xrange('task_queue', '-', '+', count=1000)
         for message in messages:
             message = message[1]
@@ -138,7 +145,9 @@ def check_dumplicate(book_id, account_name, gap_day=30):
         logger.assemble_logger.info(
             f'book_id:{str(book_id)},account_name:{account_name} is duplicate cause has duplicate task in DB')
         return True
-    r = redis.StrictRedis(host='localhost', port=6379, db=0)
+    # 连接到 Redis 服务器
+    r = redis.StrictRedis(host=REDIS_CONFIG.get('host'), port=REDIS_CONFIG.get('port'), db=REDIS_CONFIG.get('db'))
+
     messages = r.xrange('task_queue', '-', '+', count=1000)
     for message in messages:
         message = message[1]

@@ -82,7 +82,7 @@ class TaskListHandler(tornado.web.RequestHandler):
 
 
 
-class FormHandler(tornado.web.RequestHandler):
+class TaskHandler(tornado.web.RequestHandler):
     executor = ThreadPoolExecutor(max_workers=20)
 
     @tornado.gen.coroutine
@@ -101,7 +101,7 @@ class FormHandler(tornado.web.RequestHandler):
                 is_summary = False
             client_id = self.get_argument('clientId')
 
-            logger.inject_web_handler(WebSocketHandler,client_id,assemble_logger)
+            logger.inject_web_handler(WebSocketHandler,client_id,ws_logger)
             WebSocketHandler.send_message(client_id,f"this is main thread {time.time()}")
             logger.assemble_logger.info(
                 f'Starting video output for {account_name}, book ID: {book_id}, BGM: {bgm_name}, publish time: {publish_time}')
@@ -150,17 +150,36 @@ class DocToListHandler(tornado.web.RequestHandler):
             print(result)
             self.write(result)
 
+class ProcessTasksHandler(tornado.web.RequestHandler):
+    @tornado.gen.coroutine
+    def post(self):
+        try:
+            payload = json.loads(self.request.body)
+            clientId = payload.get('clientId')
+            tasks = payload.get('tasks')
+
+            # 处理tasks和clientid
+            print(f"Processing tasks for clientid: {clientId}")
+            for task in tasks:
+                print(f"Processing task: {task}")
+
+            self.write(json.dumps({"status": "success", "message": "Tasks processed successfully"}))
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json.dumps({"status": "error", "message": "Invalid JSON"}))
 
 
 
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
-        (r"/form", FormHandler),
+        (r"/form", TaskHandler),
         (r"/ws", WebSocketHandler),
         (r"/list", TaskListHandler),
         (r"/form_by_doc", DocToListHandler),
         (r"/tasks_from_doc", TaskDocHandler),
+        (r"/process_tasks", ProcessTasksHandler),
+
     ], template_path=os.path.join(os.path.dirname(__file__), "html"))
 
 
