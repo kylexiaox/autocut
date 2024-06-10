@@ -121,6 +121,8 @@
         const socketProtocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
         const socketUrl = `${socketProtocol}//${window.location.host}/ws?clientId=${clientId}`;
         let socket;
+        let heartbeatTimer;
+        const heartbeatInterval = 30000; // 30 seconds
 
         function connectWebSocket() {
             socket = new WebSocket(socketUrl);
@@ -128,32 +130,56 @@
             socket.onopen = function() {
                 console.log('Connected with clientId:', clientId);
                 retryCount = 0; // Reset the retry count on successful connection
-            };
+                startHeartbeat();
+        };
 
-            socket.onclose = function() {
-                console.log('Disconnected');
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
-                    setTimeout(connectWebSocket, 1000 * retryCount); // Exponential backoff
-                } else {
-                    console.error('Max retries reached. Unable to reconnect.');
-                }
-            };
+        socket.onclose = function(event) {
+            console.log('Disconnected', event);
+            stopHeartbeat();
+            if (retryCount < maxRetries) {
+                retryCount++;
+                const retryDelay = 1000 * Math.pow(2, retryCount) + Math.random() * 1000; // Exponential backoff with random factor
+                console.log(`Retrying connection in ${retryDelay / 1000} seconds...`);
+                setTimeout(connectWebSocket, retryDelay);
+            } else {
+                console.error('Max retries reached. Unable to reconnect.');
+            }
+        };
 
-            socket.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                console.log('Received message:', data);
-                const taskId = data.taskid;
-                const message = data.message;
-                const statusCell = document.querySelector(`#task_${taskId} .status-cell`);
-                if (statusCell) {
-                    statusCell.textContent = message;
-                }
-            };
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('Received message:', data);
+            const taskId = data.taskid;
+            const message = data.message;
+            const statusCell = document.querySelector(`#task_${taskId} .status-cell`);
+            if (statusCell) {
+                statusCell.textContent = message;
+            }
+        };
+
+        socket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    function startHeartbeat() {
+        if (heartbeatTimer) {
+            clearInterval(heartbeatTimer);
         }
+        heartbeatTimer = setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'heartbeat' }));
+            }
+        }, heartbeatInterval);
+    }
 
-        connectWebSocket();
+    function stopHeartbeat() {
+        if (heartbeatTimer) {
+            clearInterval(heartbeatTimer);
+        }
+    }
+
+    connectWebSocket();
 
         document.getElementById('urlForm').addEventListener('submit', function(event) {
             event.preventDefault();  // Prevent default form submission

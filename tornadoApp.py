@@ -40,19 +40,45 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
 
     def open(self):
         self.client_id = self.get_argument('clientId')
-        WebSocketHandler.clients[self.client_id] = self
-        print(f"WebSocket connection opened with clientId: {self.client_id}")
+        self.clients[self.client_id] = self
+        print(f"WebSocket opened for clientId: {self.client_id}")
+        self.heartbeat_timeout = None
+        self.reset_heartbeat()
+
+    def on_message(self, message):
+        data = json.loads(message)
+        if data.get('type') == 'heartbeat':
+            print(f"Heartbeat received from clientId: {self.client_id}")
+            self.reset_heartbeat()
+        else:
+            # Handle other types of messages
+            pass
 
     def on_close(self):
-        if self.client_id in WebSocketHandler.clients:
-            del WebSocketHandler.clients[self.client_id]
-        print(f"WebSocket connection closed for clientId: {self.client_id}")
+        print(f"WebSocket closed for clientId: {self.client_id}")
+        if self.heartbeat_timeout:
+            self.heartbeat_timeout.cancel()
+
+    def reset_heartbeat(self):
+        if self.heartbeat_timeout:
+            self.heartbeat_timeout.cancel()
+        self.heartbeat_timeout = tornado.ioloop.IOLoop.current().call_later(45, self.close_connection)
+
+    def close_connection(self):
+        print(f"Heartbeat lost for clientId: {self.client_id}, closing connection.")
+        self.close()
 
     @classmethod
     def send_message(cls, client_id, message):
         client = cls.clients.get(client_id)
+        client = cls.clients.get(client_id)
         if client:
-            client.write_message(message)
+            try:
+                client.write_message(message)
+            except Exception as e:
+                logger.assemble_logger.error(f"Failed to send message to client {client_id}: WebSocket is closed.")
+
+
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -153,6 +179,8 @@ class DocToListHandler(tornado.web.RequestHandler):
 
 
 class ProcessTasksHandler(tornado.web.RequestHandler):
+    executor = ThreadPoolExecutor(max_workers=20)
+
     @tornado.gen.coroutine
     def post(self):
         try:
@@ -163,25 +191,39 @@ class ProcessTasksHandler(tornado.web.RequestHandler):
 
             # 处理tasks和clientid
             print(f"Processing tasks for clientid: {clientId}")
-            for task in tasks:
-                print(f"Processing task: {task}")
-                account_name = task.get('account_name')
-                book_id = task.get('book_id')
-                bgm_name = task.get('bgm_name')
-                publish_time = task.get('publish_time')
-                is_summary = task.get('is_summary')
-                account_id = config.account.get(account_name).get('account_id')
-                taskid = str(account_id) + str(book_id)
-                message_dict = {'taskid': taskid, 'message': f'开始处理任务'}
-                logger.ws_logger.info(json.dumps(message_dict))
-                try:
-                    video_output(account_name=account_name, book_id=book_id, publish_time=publish_time, bgm_name=bgm_name,
-                                 is_test=False, is_push=True, is_summary=is_summary)
-                    time.sleep(1)
-                except Exception as e:
-                    message_dict = {'taskid': taskid, 'message': f'任务处理失败:{e}'}
+
+            def process_tasks(tasks):
+                for task in tasks:
+                    print(f"Processing task: {task}")
+                    account_name = task.get('account_name')
+                    book_id = task.get('book_id')
+                    bgm_name = task.get('bgm_name')
+                    publish_time = task.get('publish_time')
+                    is_summary = task.get('is_summary')
+                    account_id = config.account.get(account_name).get('account_id')
+                    taskid = str(account_id) + str(book_id)
+                    message_dict = {'taskid': taskid, 'message': f'开始处理任务'}
+                    logger.ws_logger.info(json.dumps(message_dict))
+                    try:
+                        video_output(account_name=account_name, bookid=book_id, publish_time=publish_time,
+                                     bgm_name=bgm_name,
+                                     is_test=False, is_push=True, is_summary=is_summary)
+                        time.sleep(1)
+                    except Exception as e:
+                        message_dict = {'taskid': taskid, 'message': f'任务处理失败:{e}'}
+                        logger.ws_logger.error(json.dumps(message_dict))
+                        continue
+                    message_dict = {'taskid': taskid, 'message': f'任务处理成功'}
                     logger.ws_logger.error(json.dumps(message_dict))
-                    continue
+                return True
+
+            future = tornado.ioloop.IOLoop.current().run_in_executor(
+                self.executor,
+                process_tasks,
+                tasks
+            )
+
+            yield future  # 等待任务完成
 
             self.write(json.dumps({"status": "success", "message": "Tasks processed successfully"}))
         except json.JSONDecodeError:

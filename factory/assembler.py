@@ -209,7 +209,7 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         origin_summary,origin_content = crawler.get_content_from_fanqie_dp(bookid,is_summary)
         logger.assemble_logger.info(f"origin_summary:{origin_summary}")
         logger.assemble_logger.info(f"origin_content:{origin_content[:100]}")
-        if origin_summary != '':
+        if origin_summary != '' and origin_content is not None:
             cleaned_summary = clean_the_text(origin_summary)
         cleaned_text = clean_the_text(origin_content) # 去除第一章、1,等内容
         if is_test:
@@ -227,7 +227,7 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         info_str += 'book_name : ' + bookinfo[0] + '\n'
         info_str += 'abstract : ' + bookinfo[1]
         # 获取摘要,和拆分的summary做比对
-        if origin_summary == '':
+        if origin_summary != '' and origin_content is not None:
             abstract = bookinfo[0]
         else:
             abstract = cleaned_summary
