@@ -104,7 +104,15 @@
                         <th>Media</th>
                         <th>Content Type</th>
                         <th>Platform</th>
-                        <th>Description</th>
+                        <th>播放数</th>
+                        <th>点赞数</th>
+                        <th>收藏数</th>
+                        <th>评论数</th>
+                        <th>status</th>
+                        <th>平均播放时长</th>
+                        <th>完播率</th>
+                        <th>带来粉丝数</th>
+
                     </tr>
                 </thead>
                 <tbody>
@@ -120,7 +128,14 @@
                             <td>{{ task.get('media') }}</td>
                             <td>{{ task.get('content_type') }}</td>
                             <td>{{ task.get('platform') }}</td>
-                            <td>{{ task.get('content_description') }}</td>
+                            <td>{{ task.get('play_count') }}</td>
+                            <td>{{ task.get('digg_count') }}</td>
+                            <td>{{ task.get('collect_count') }}</td>
+                            <td>{{ task.get('comment_count') }}</td>
+                            <td>{{ task.get('status_value') }}</td>
+                            <td>{{ task.get('play_avg_time') }}</td>
+                            <td>{{ task.get('play_finish_ratio') }}</td>
+                            <td>{{ task.get('new_fans_count') }}</td>
                         </tr>
                     {% end %}
                 </tbody>

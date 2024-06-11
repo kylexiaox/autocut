@@ -66,13 +66,17 @@ def get_task_list(gap_day=3, account_name=None,publish_type = None):
     if publish_type is None or publish_type == 'published':
         try:
             db = DButils()
-            db_name = config.DB_NAME.get('video_record')
-            sql = f"SELECT * FROM {db_name}  WHERE DATEDIFF(CURDATE(), STR_TO_DATE(send_time, '%Y-%m-%d')) <= {gap_day} "
+            db_name_record = config.DB_NAME.get('video_record')
+            db_name_statistics = config.DB_NAME.get('video_statistics')
+            prefix_sql = f'WITH latest_statis AS ( SELECT *, ROW_NUMBER() OVER ( PARTITION BY video_id ORDER BY STR_TO_DATE( publish_time, "%Y-%m-%d" ) DESC ) AS rn FROM {db_name_statistics} ) '
+            sql = prefix_sql +  f"SELECT t.*,tt.* FROM {db_name_record} t left join latest_statis tt on t.video_id = tt.video_id WHERE DATEDIFF(CURDATE(), STR_TO_DATE(t.send_time, '%Y-%m-%d')) <= {gap_day} "
             if account_name and account_name != 'all':
                 account_id = config.account.get(account_name).get('account_id')
-                sql += f"AND account_id = {account_id}"
+                sql += f"AND t.account_id = {account_id} "
+            sql += f"AND tt.rn = 1 "
+            sql += "AND t.video_id is not null "
             # 按照时间降序排列
-            sql += " ORDER BY STR_TO_DATE(publish_time, '%Y-%m-%d') DESC"
+            sql += " ORDER BY STR_TO_DATE(t.publish_time, '%Y-%m-%d') DESC"
             # 执行sql
             db.cursor_d.execute(sql)
             res = db.cursor_d.fetchall()
