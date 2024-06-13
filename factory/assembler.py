@@ -209,7 +209,7 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         origin_summary,origin_content = crawler.get_content_from_fanqie_dp(bookid,is_summary)
         logger.assemble_logger.info(f"origin_summary:{origin_summary}")
         logger.assemble_logger.info(f"origin_content:{origin_content[:100]}")
-        if origin_summary != '' and origin_summary is not None:
+        if origin_summary != '' and origin_content is not None:
             cleaned_summary = clean_the_text(origin_summary)
         cleaned_text = clean_the_text(origin_content) # 去除第一章、1,等内容
         if is_test:
@@ -227,10 +227,10 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         info_str += 'book_name : ' + bookinfo[0] + '\n'
         info_str += 'abstract : ' + bookinfo[1]
         # 获取摘要,和拆分的summary做比对
-        if origin_summary != '' and origin_summary is not None:
-            abstract = cleaned_summary
-        else:
+        if origin_summary != '' and origin_content is not None:
             abstract = bookinfo[0]
+        else:
+            abstract = cleaned_summary
         if count_chinese_characters(abstract) < 20:
             # 如果当前摘要小于20个字，得从正文中截取
             abstract = split_content(text, gap=30, end_with='。')[0]
@@ -482,7 +482,7 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
         logger.assemble_logger.info(f'video task is duplicate return False')
         message_dict = {'taskid': taskid, 'message': f'任务重复，结束处理'}
         logger.ws_logger.info(json.dumps(message_dict))
-        raise Exception(message_dict)
+        return False
     logger.assemble_logger.info(f'开始处理任务：书籍id是：{bookid},发布时间：{publish_time},BGM：{bgm_name},发布到账户：{account_name}上....')
     task = {
         'taskid': taskid,

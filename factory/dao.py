@@ -61,23 +61,24 @@ def get_task_list(gap_day=3, account_name=None,publish_type = None):
     """
     result = []
     # 去处已入库的任务，FROM DB
-
+    logger.assemble_logger.info(f'get task list, gap_day:{gap_day},account_name:{account_name},publish_type:{publish_type}')
     # sql，取出最近days天的任务,对比字段是send_time,send_time的类型是字符串
     if publish_type is None or publish_type == 'published':
         try:
             db = DButils()
             db_name_record = config.DB_NAME.get('video_record')
             db_name_statistics = config.DB_NAME.get('video_statistics')
-            prefix_sql = f'WITH latest_statis AS ( SELECT *, ROW_NUMBER() OVER ( PARTITION BY video_id ORDER BY STR_TO_DATE( publish_time, "%Y-%m-%d" ) DESC ) AS rn FROM {db_name_statistics} ) '
+            prefix_sql = f'WITH latest_statis AS ( SELECT *, ROW_NUMBER() OVER ( PARTITION BY video_id ORDER BY STR_TO_DATE( statis_time, "%Y-%m-%d %H:%i:%s" ) DESC ) AS rn FROM {db_name_statistics} ) '
             sql = prefix_sql +  f"SELECT t.*,tt.* FROM {db_name_record} t left join latest_statis tt on t.video_id = tt.video_id WHERE DATEDIFF(CURDATE(), STR_TO_DATE(t.send_time, '%Y-%m-%d')) <= {gap_day} "
             if account_name and account_name != 'all':
                 account_id = config.account.get(account_name).get('account_id')
                 sql += f"AND t.account_id = {account_id} "
-            sql += f"AND tt.rn = 1 "
+            sql += "AND (tt.rn = 1 OR tt.rn IS NULL) "
             sql += "AND t.video_id is not null "
             # 按照时间降序排列
-            sql += " ORDER BY STR_TO_DATE(t.publish_time, '%Y-%m-%d') DESC"
+            sql += " ORDER BY STR_TO_DATE(t.publish_time, '%Y-%m-%d %H:%i:%s') DESC"
             # 执行sql
+            print(sql)
             db.cursor_d.execute(sql)
             res = db.cursor_d.fetchall()
             for re in res:
