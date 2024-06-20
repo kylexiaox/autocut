@@ -38,26 +38,30 @@ def get_docs(url,type = 'table'):
 
         # 提取表格数据
         if type == 'table':
-            table = soup.find('table')
-            # 将表格数据转换为DataFrame
-            df = pd.read_html(str(table))[0]
-            # 删除索引
-            df = df.drop(columns=['Unnamed: 0'])
-            # 删除空行
-            df = df.dropna(how='all',axis=1).dropna(how='all',axis=0)
-            # 将 DataFrame 转换为 list of dicts，第一行作为 key
-            results = df.iloc[1:].to_dict(orient='records')
-            keys = df.iloc[0].to_dict()
+            try:
+                table = soup.find('table')
+                # 将表格数据转换为DataFrame
+                df = pd.read_html(str(table))[0]
+                # 删除索引
+                df = df.drop(columns=['Unnamed: 0'])
+                # 删除空行
+                df = df.dropna(how='all',axis=1).dropna(how='all',axis=0)
+                # 将 DataFrame 转换为 list of dicts，第一行作为 key
+                results = df.iloc[1:].to_dict(orient='records')
+                keys = df.iloc[0].to_dict()
 
-            # 替换每个字典中的 key
-            results = [{keys[k]: v for k, v in row.items()} for row in results]
-            for re in results:
-                # 调整publish_time的格式，目前的格式是'YYYY/MM/DD HH:MM' 变成'YYYY-MM-DD HH:MM'
-                re['publish_time'] = re['publish_time'].replace('/', '-')
-                account_name = re['account_name']
-                re['account_id'] = config.account.get(account_name).get('account_id')
+                # 替换每个字典中的 key
+                results = [{keys[k]: v for k, v in row.items()} for row in results]
+                for re in results:
+                    # 调整publish_time的格式，目前的格式是'YYYY/MM/DD HH:MM' 变成'YYYY-MM-DD HH:MM'
+                    re['publish_time'] = re['publish_time'].replace('/', '-')
+                    account_name = re['account_name']
+                    re['account_id'] = config.account.get(account_name).get('account_id')
 
-            return results
+                return results
+            except Exception as e:
+                print(e)
+                return []
         else:
             return []
     else:

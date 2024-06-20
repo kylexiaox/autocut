@@ -29,11 +29,4 @@ OPENAI_API_KEY='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'
 
 
 if __name__ == '__main__':
-    push_to_mq_test({'book_id': 7348020574980951102, 'alias': '备胎日记', 'book_name': '不当舔狗后', 'account': 47040731565,
-                   'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后',
-                   'title': '番茄小说sou：《备胎日记》',
-                   'type': 'douyin_short',
-                   'description': '在一起的第六年，我跟许钰提了分手。原因是我在她的车上看到了猫毛。而她从来不让我的猫上她的车，她说她有洁癖。听我这么说她无所谓的耸肩：[就因为这个？]因为这个，也不只因为是这个',
-                   'img_path': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后/cover.png',
-                   'platform': 'fanqie',
-                   'publish_time': '2024-06-01 11:00', 'content_type': 'short_novel'})
+    push_to_mq_test({'book_id': '7352783803380679192', 'alias': '若若不差钱', 'book_name': '太子党全都装穷耍我', 'account': 34663015465, 'filepath': '/Volumes/home/小说推文/产出视频/成片2024-06-19/34663015465/7352783803380679192_太子党全都装穷耍我', 'title': '🍅小说sou:《若若不差钱》', 'type': 'douyin_short', 'description': '今天是弟弟姜枫的生日，我找老板预支100块工资提前半天下了班，打算给他个惊喜。说实话还有点肉痛，要知道这可是家里一星期的伙食费。为了省2块钱的公交车费，我决定步行回家。走到楼下后我脚步一顿，抬手揉了揉眼睛，怔愣地看着一辆豪车停在我们这个破烂小区', 'img_path': '/Volumes/home/小说推文/产出视频/成片2024-06-19/34663015465/7352783803380679192_太子党全都装穷耍我/cover.png', 'platform': 'fanqie', 'publish_time': '2024-6-19 11:39', 'content_type': 'short_novel'})

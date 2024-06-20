@@ -182,7 +182,7 @@ def clip_add_margin(clip, w_l_ratio):
 
 
 # @progress_bar_decorator(total_iterations=100)
-def combineVideo(tim_len, video_type, frag_dur=30, speed=1, bitrate='3000k', codec='libx264', fps=30, write=True, ):
+def combineVideo(tim_len, video_type,output_folder=None, speed=1, bitrate='3000k', codec='libx264', fps=30, write=True, ):
     """
     :param tim_len: 时间要求长度
     :param type: 视频类型，哪种类型的内容
@@ -272,7 +272,8 @@ def combineVideo(tim_len, video_type, frag_dur=30, speed=1, bitrate='3000k', cod
         # 这里更改了包里的resize文件的方法，resized_pil = pilim.resize(newsize[::-1], Image.LANCZOS)
         clip = clip.resize(new_resolutions)
     if write:
-        output_folder = config.result_directory + '/' + video_type
+        if output_folder is None:
+            output_folder = config.result_directory + '/' + video_type
         c_time = str(time.time()).split('.')[0]
         output_path = os.path.join(output_folder, c_time + '.mp4')
         # 确保输出文件夹路径存在，如果不存在则创建
@@ -293,5 +294,5 @@ if __name__ == '__main__':
     # for i in range(10):
     # combineVideo(tim_len=1200,type='解压素材',frag_dur=20,speed=1.5)
     # combineVideo(tim_len=1200, type='甜点饮品制作视频', frag_dur=20, speed=1)
-    combineVideo(tim_len=120, video_type='蛋仔素材', frag_dur=30, speed=1)
+    combineVideo(tim_len=120, video_type='蛋仔素材', speed=1)
     # combineVideo(sys.argv[0],sys.argv[1], sys.argv[2])

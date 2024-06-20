@@ -64,7 +64,7 @@ def log_progress(stop_event,taskid):
         stop_event.wait(15)  # 每隔 15 秒记录一次日志
 
 
-def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, voice_type='female',
+def assembler(bookid, bgm_name, alias, publish_time, account_id, content_type=config.content_type[0], voice_type='female',
               video_type='西餐美食小吃视频', platform='fanqie',
               bitrate='5000k', cover_img='girl1_large',is_summary=True, is_test=False):
     """
@@ -84,11 +84,11 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     :return:
     """
     # 获取内容音频
-    taskid = str(account) + str(bookid)
+    taskid = str(account_id) + str(bookid)
     fq_crawler = fanqie_crawler()
     message_dict = { 'taskid': taskid, 'message': f'开始获取内容和音频...' }
     logger.ws_logger.info(json.dumps(message_dict))
-    audio_clip, srt_path, book_name = get_text_voice(fq_crawler, bookid, content_type=content_type,
+    audio_clip, srt_path, book_name,output_folder = get_text_voice(fq_crawler,account_id = account_id, bookid=bookid, content_type=content_type,
                                                      voice_type=voice_type, use_cache=True,is_summary=is_summary, is_test=is_test)
     # 音量标准化
     message_dict = {'taskid': taskid, 'message': f'处理音频+BGM...'}
@@ -114,7 +114,7 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     logger.assemble_logger.info(f'合并解压视频素材')
     message_dict = {'taskid': taskid, 'message': f'合并素材...'}
     logger.ws_logger.info(json.dumps(message_dict))
-    video_clip, filelog = combineVideo(tim_len=overlay_audio_clip.duration, frag_dur=None, speed=1,
+    video_clip, filelog = combineVideo(tim_len=overlay_audio_clip.duration, speed=1,output_folder=output_folder,
                                        video_type=video_type,
                                        write=False)
     logger.assemble_logger.info(f'音视频合并')
@@ -133,10 +133,6 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     label_text = config.label_str.get(platform) + alias
     final_clip = add_label_to_video(text=label_text, pic_file=config.icon_file.get(platform), video_clip=video_clip,
                                     video_type=video_type)
-    if is_test:
-        output_folder = config.result_directory + '/' + 'test_' + str(bookid) + '_' + book_name
-    else:
-        output_folder = config.result_directory + '/' + str(bookid) + '_' + book_name
     c_time = str(time.time()).split('.')[0]
     output_path = os.path.join(output_folder, str(bookid) + '_' + bgm_name + '.mp4')
     # 确保输出文件夹路径存在，如果不存在则创建
@@ -174,16 +170,18 @@ def assembler(bookid, bgm_name, alias, publish_time, account, content_type=0, vo
     get_cover_img(text=f"《{alias}》", w_l_ratio=final_clip.size[0] / final_clip.size[1], img=cover_img,
                   output_folder=output_folder)
     # push_to_media(account='account',filepath=output_folder,title=f"番茄小说sou：《{alias}》",publish_time= publish_time)
-    result = {'book_id': bookid, 'alias': alias, 'book_name': book_name, 'account': account, 'filepath': output_folder,'title': title_str,
+    result = {'book_id': bookid, 'alias': alias, 'book_name': book_name, 'account': account_id, 'filepath': output_folder,'title': title_str,
                 'description': description,
                 'publish_time': publish_time, 'content_type': 'short_novel'}
     logger.assemble_logger.info(f'处理完成，返回结果：{result}')
     return result
 
 
-def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cache=True, is_summary=True, is_test=False):
+def get_text_voice(crawler, account_id, bookid, content_type, voice_type='female', use_cache=True, is_summary=True, is_test=False):
     """
     通过bookid拿音频+字幕
+    :param crawler:
+    :param account_id:
     :param bookid:
     :param content_type:
     :param voice_type:
@@ -191,25 +189,25 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
     :param is_test: 返回测试内容，100个字
     :return:
     """
-    if content_type == 0:
+    if content_type == config.content_type[0]:
         # 短篇
         bookinfo = crawler.get_book_info(bookid)
         if is_test:
             # 测试环境的文件夹
-            final_output_folder = config.result_directory + '/' + 'test_' + str(bookid) + '_' + bookinfo[0]
+            final_output_folder = config.result_directory + f'/{str(account_id)}' + '/' + 'test_' + str(bookid) + '_' + bookinfo[0]
         else:
-            final_output_folder = config.result_directory + '/' + str(bookid) + '_' + bookinfo[0]
+            final_output_folder = config.result_directory + f'/{str(account_id)}' + '/' + str(bookid) + '_' + bookinfo[0]
         if use_cache is True and os.path.exists(final_output_folder + '/' + bookinfo[0] + '.mp3'):
             # 如果文件存在，直接返回存量的内容
             srt_path = final_output_folder + '/' + bookinfo[0] + '.srt'
             audio_clip = AudioFileClip(final_output_folder + '/' + bookinfo[0] + '.mp3')
-            return audio_clip, srt_path, bookinfo[0]
+            return audio_clip, srt_path, bookinfo[0],final_output_folder
         logger.assemble_logger.info(f"获取音频文件：{bookid}")
         bookinfo = crawler.get_book_info(bookid)
         origin_summary,origin_content = crawler.get_content_from_fanqie_dp(bookid,is_summary)
         logger.assemble_logger.info(f"origin_summary:{origin_summary}")
         logger.assemble_logger.info(f"origin_content:{origin_content[:100]}")
-        if origin_summary != '' and origin_content is not None:
+        if origin_summary != '' and origin_summary is not None:
             cleaned_summary = clean_the_text(origin_summary)
         cleaned_text = clean_the_text(origin_content) # 去除第一章、1,等内容
         if is_test:
@@ -221,16 +219,16 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         for index, text in enumerate(texts):
             paths.append(dubbing_for_long(long_text=text, result_filename=str(bookinfo[0]) + '_' + str(index),
                                           voice_type=voice_type,
-                                          output_dir=config.result_directory + '/' + str(bookid) + '_' + bookinfo[0],
+                                          output_dir=final_output_folder,
                                           use_cache=use_cache))
         info_str = 'book_id : ' + str(bookinfo[2]) + '\n'
         info_str += 'book_name : ' + bookinfo[0] + '\n'
         info_str += 'abstract : ' + bookinfo[1]
         # 获取摘要,和拆分的summary做比对
-        if origin_summary != '' and origin_content is not None:
-            abstract = bookinfo[0]
-        else:
+        if origin_summary != '' and origin_summary is not None:
             abstract = cleaned_summary
+        else:
+            abstract = bookinfo[0]
         if count_chinese_characters(abstract) < 20:
             # 如果当前摘要小于20个字，得从正文中截取
             abstract = split_content(text, gap=30, end_with='。')[0]
@@ -262,8 +260,8 @@ def get_text_voice(crawler, bookid, content_type=0, voice_type='female', use_cac
         srt_clip = merge_srt(srts)
         srt_path = final_output_folder + '/' + bookinfo[0] + '.srt'
         srt_clip.save(srt_path)
-        return audio_clip, srt_path, bookinfo[0]
-    else:
+        return audio_clip, srt_path, bookinfo[0],final_output_folder
+    elif content_type == config.content_type[1]:
         # 长篇
         pass
 
@@ -470,12 +468,12 @@ def push_to_mq_test(msg):
     logger.assemble_logger.info(f"测试发送数据id：{message_id},消息： {msg}")
 
 
-def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=False,is_push=True,is_summary= True):
+def video_output(account_name, bookid, publish_time,content_type, bgm_name=None, is_test=False,is_push=True,is_summary= True):
     # 封装 消息字符串
-    account = config.account.get(account_name).get('account_id')
+    account_id = config.account.get(account_name).get('account_id')
     # 封装task dict
 
-    taskid = str(account) + str(bookid)
+    taskid = str(account_id) + str(bookid)
     message_dict = {'taskid': taskid, 'message': f'任务开始处理'}
     logger.ws_logger.info(json.dumps(message_dict))
     if dao.check_dumplicate(book_id=bookid, account_name=account_name):
@@ -505,7 +503,7 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
         voice_type = config.account.get(account_name).get('voice_type')
         cover_img = config.account.get(account_name).get('cover_img')
         video_type = config.account.get(account_name).get('video_type')
-        result = assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account=account, video_type=video_type,
+        result = assembler(bookid=bookid, bgm_name=bgm_name, voice_type=voice_type, account_id=account_id, video_type=video_type,content_type=content_type,
                           cover_img=cover_img, publish_time=publish_time, alias=alias_name,is_summary = is_summary, is_test=is_test)
         # result = {'book_id': '7366551041162103833', 'alias': '打脸男闺蜜', 'book_name': '感化不了的妻子，我不要了', 'account': 30365867345, 'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-26/7366551041162103833_感化不了的妻子，我不要了', 'title': '🍅小说sou:《打脸男闺蜜》', 'description': '杀青庆功宴上，老婆把赞助商送的男款情侣表送给了前男友。二人拿着情侣表拍了张接吻照。大伙儿看了我一眼错愕的问她：“沈老师，你亲错人了吧？”“戏都拍完了，这是什么情况', 'publish_time': '0', 'content_type': 'short_novel'}
         if is_push:
@@ -532,13 +530,14 @@ def video_output(account_name, bookid, publish_time, bgm_name=None, is_test=Fals
 
 if __name__ == '__main__':
     pass
-    push_to_mq_test({'book_id': 7348020574980951102, 'alias': '备胎日记', 'book_name': '不当舔狗后', 'account': 47040731565,
-     'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后', 'title': '番茄小说sou：《备胎日记》',
-     'type': 'douyin_short',
-     'description': '在一起的第六年，我跟许钰提了分手。原因是我在她的车上看到了猫毛。而她从来不让我的猫上她的车，她说她有洁癖。听我这么说她无所谓的耸肩：[就因为这个？]因为这个，也不只因为是这个',
-     'img_path': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后/cover.png', 'platform': 'fanqie',
-     'publish_time': '2024-06-01 11:00', 'content_type': 'short_novel'})
-
+    # push_to_mq_test({'book_id': 7348020574980951102, 'alias': '备胎日记', 'book_name': '不当舔狗后', 'account': 949575138,
+    #  'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后', 'title': '番茄小说sou：《备胎日记》',
+    #  'type': 'douyin_short',
+    #  'description': '在一起的第六年，我跟许钰提了分手。原因是我在她的车上看到了猫毛。而她从来不让我的猫上她的车，她说她有洁癖。听我这么说她无所谓的耸肩：[就因为这个？]因为这个，也不只因为是这个',
+    #  'img_path': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-12/7348020574980951102_不当舔狗后/cover.png', 'platform': 'fanqie',
+    #  'publish_time': '2024-06-18 11:00', 'content_type': 'short_novel'})
+    push_to_mq_test({'book_id': '7352783803380679192', 'alias': '若若不差钱', 'book_name': '太子党全都装穷耍我', 'account': 34663015465, 'filepath': '/Volumes/home/小说推文/产出视频/成片2024-06-19/34663015465/7352783803380679192_太子党全都装穷耍我', 'title': '🍅小说sou:《若若不差钱》', 'type': 'douyin_short', 'description': '今天是弟弟姜枫的生日，我找老板预支100块工资提前半天下了班，打算给他个惊喜。说实话还有点肉痛，要知道这可是家里一星期的伙食费。为了省2块钱的公交车费，我决定步行回家。走到楼下后我脚步一顿，抬手揉了揉眼睛，怔愣地看着一辆豪车停在我们这个破烂小区', 'img_path': '/Volumes/home/小说推文/产出视频/成片2024-06-19/34663015465/7352783803380679192_太子党全都装穷耍我/cover.png', 'platform': 'fanqie', 'publish_time': '2024-6-19 11:39', 'content_type': 'short_novel'}
+)
     # video_output(account_name='douyin_nan1', bookid=7348020574980951102, bgm_name='用情',
     #              publish_time='2024-05-14 11:00')
     # video_output(account_name='douyin_nan1', bookid=7355507776015043646, bgm_name='凄美地',

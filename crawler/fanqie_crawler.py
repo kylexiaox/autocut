@@ -245,7 +245,8 @@ def clean_the_soup_short(soup,is_summary=True):
     """
     logger.assemble_logger.info(f"开始处理文本文件，剔除章节标题,并拆解摘要和正文内容...")
     # 编写正则表达式，匹配只含数字、中文数字、"第x章" 格式的内容
-    pattern = re.compile(r'^[0-9一二三四五六七八九十百千万亿]+$|^第[0-9一二三四五六七八九十百千万亿]+章$')
+    # pattern = re.compile(r'^[0-9一二三四五六七八九十百千万亿]+$|^第[0-9一二三四五六七八九十百千万亿]+章$')
+    pattern = re.compile( r'^[0-9一二三四五六七八九十百千万亿，,、．。.\-:：!！?？、]+$|^第[0-9一二三四五六七八九十百千万亿]+章$')
     # 创建两个新的BeautifulSoup对象，一个用于存放摘要内容，一个用于存放正文内容
     summary = BeautifulSoup('', 'html.parser')
     content = BeautifulSoup('', 'html.parser')

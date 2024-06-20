@@ -45,7 +45,7 @@ key = 'abcdefgabcdefg12'
 
 
 
-def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 8,output_dir = None,use_cache = False,srt = False):
+def dubbing_for_long(long_text,result_filename,voice_type='male',content_type='short_novel',output_dir = None,use_cache = False,srt = False):
     """
     content_type = 8 为短片，0为长篇
     flag  为存量拉取,true 为存量拉取，不访问无网络，false为访问网络
@@ -62,9 +62,9 @@ def dubbing_for_long(long_text,result_filename,voice_type='male',content_type = 
     femailvoice = {'voice_type':'309102','style_degree': '0','pitch':'0%'}
 
     if output_dir is None:
-        if content_type == 8:
+        if content_type == 'short_novel':
             output_dir = config.audio_directory_short
-        elif content_type == 0:
+        elif content_type == 'long_novel':
             output_dir = config.audio_directory_long
 
     if use_cache is True and os.path.exists(output_dir + '/' +result_filename + '.mp3'):

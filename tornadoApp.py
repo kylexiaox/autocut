@@ -85,7 +85,8 @@ class MainHandler(tornado.web.RequestHandler):
     def get(self):
         bgms = [name for name in os.listdir(config.bgm_directory) if
                 os.path.isdir(os.path.join(config.bgm_directory, name))]
-        self.render("index.html", account_options=config.account, bgm_options=bgms)
+        content_type = config.content_type
+        self.render("index.html", account_options=config.account, bgm_options=bgms,content_type = content_type)
 
 
 class TaskDocHandler(tornado.web.RequestHandler):
@@ -119,6 +120,7 @@ class TaskHandler(tornado.web.RequestHandler):
             account_name = self.get_argument('account')
             publish_time = self.get_argument('publish_time')
             is_summary = self.get_argument('is_summary', '1')
+            content_type = self.get_argument('content_type')
             if publish_time != '0':
                 publish_time = publish_time.replace('T', ' ')
             if is_summary == '1':
@@ -138,6 +140,7 @@ class TaskHandler(tornado.web.RequestHandler):
                 account_name,
                 book_id,
                 publish_time,
+                content_type,
                 bgm_name,
                 False,  # 是否测试
                 True,  # 是否需要推送到MQ
@@ -203,9 +206,10 @@ class ProcessTasksHandler(tornado.web.RequestHandler):
                     account_id = config.account.get(account_name).get('account_id')
                     taskid = str(account_id) + str(book_id)
                     message_dict = {'taskid': taskid, 'message': f'开始处理任务'}
+                    content_type = task.get('content_type')
                     logger.ws_logger.info(json.dumps(message_dict))
                     try:
-                        video_output(account_name=account_name, bookid=book_id, publish_time=publish_time,
+                        video_output(account_name=account_name, bookid=book_id, publish_time=publish_time,content_type=content_type,
                                      bgm_name=bgm_name,
                                      is_test=False, is_push=True, is_summary=is_summary)
                         time.sleep(1)
@@ -248,7 +252,15 @@ def make_app():
 
 
 if __name__ == "__main__":
-    # 使用 AnyThreadEventLoopPolicy 确保在多线程中正确使用 asyncio
+    # push_to_mq_test({'book_id': 7348020574980951102, 'alias': '备胎日记', 'book_name': '不当舔狗后', 'account': 949575138,
+    #                  'filepath': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-27/7316445250069728295_狗无常',
+    #                  'title': '番茄小说sou：《备胎日记》',
+    #                  'type': 'douyin_short',
+    #                  'description': '在一起的第六年，我跟许钰提了分手。原因是我在她的车上看到了猫毛。而她从来不让我的猫上她的车，她说她有洁癖。听我这么说她无所谓的耸肩：[就因为这个？]因为这个，也不只因为是这个',
+    #                  'img_path': '/Volumes/公共空间/小说推文/产出视频/成片/2024-05-27/7316445250069728295_狗无常/cover.png',
+    #                  'platform': 'fanqie',
+    #                  'publish_time': '2024-06-18 11:00', 'content_type': 'short_novel'})
+    # # 使用 AnyThreadEventLoopPolicy 确保在多线程中正确使用 asyncio
     asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
     app = make_app()
     app.listen(8888)  # 监听端口 8888
